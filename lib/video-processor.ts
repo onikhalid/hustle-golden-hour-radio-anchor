@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { getOverlayConfig, getVideoSequence } from './overlay-config'
-import { ProductionTimestampManager, type GameSession } from './production-timestamps'
+import { ProductionTimestampManager, type GameSession, type GameEvent } from './production-timestamps'
+import eventsToFlatTimestamps from './timestamp-adapter'
 
 export interface VideoSegment {
   type: "game-ready" | "question-ready" | "question" | "time-starts" | "countdown" | "time-up-fetching" | "leaderboard"
@@ -34,12 +35,8 @@ export interface ProcessingOptions {
   customOverlayFiles?: { [key: string]: File } // Custom overlay files
 }
 
-export interface TimestampEvent {
-  event: string
-  time: number
-  duration: number
-  type: "game-ready" | "question-ready" | "question" | "time-starts" | "countdown" | "time-up-fetching" | "leaderboard"
-}
+// Use `GameEvent` structure from production timestamps for consistency
+export type TimestampEvent = GameEvent
 
 export class VideoProcessor {
   private segments: VideoSegment[] = []
@@ -63,7 +60,7 @@ export class VideoProcessor {
   async processVideos(
     videoFiles: File[],
     options: ProcessingOptions,
-  ): Promise<{ segments: VideoSegment[]; timestamps: TimestampEvent[]; totalDuration: number; gameSession: GameSession }> {
+  ): Promise<{ segments: VideoSegment[]; timestamps: TimestampEvent[]; video_time_stamps: Record<string, string>[]; totalDuration: number; gameSession: GameSession }> {
     const processId = Date.now()
     console.log(`processVideos called ${processId} with ${videoFiles.length} files`)
     this.segments = []
@@ -71,8 +68,10 @@ export class VideoProcessor {
     this.updateProgress(0)
 
     let currentTime = 0
-    const timestamps: TimestampEvent[] = []
+    // We'll generate production-ready timestamps via ProductionTimestampManager
     const overlayConfig = getOverlayConfig(options.useCustomOverlays ? options.customOverlayFiles : undefined)
+    // Collect question video durations (in seconds) for the production timestamp generator
+    const questionVideos: { duration: number; id: string }[] = []
 
     // Add initial game ready segment
     const gameReadySegment: VideoSegment = {
@@ -83,12 +82,7 @@ export class VideoProcessor {
     }
     this.segments.push(gameReadySegment)
 
-    timestamps.push({
-      event: "Game Get Ready",
-      time: currentTime,
-      duration: options.gameReadyDuration,
-      type: "game-ready",
-    })
+    // Legacy human-readable timestamp entries removed; using production timestamps instead
 
     currentTime += options.gameReadyDuration
 
@@ -98,6 +92,9 @@ export class VideoProcessor {
       const videoFile = videoFiles[i]
       const videoDuration = await this.getVideoDuration(videoFile)
       const questionNumber = i + 1
+
+      // Record the actual uploaded question video duration for timestamp generation
+      questionVideos.push({ duration: videoDuration, id: `question_${questionNumber}` })
 
       console.log(`Processing question ${questionNumber} (index ${i}), duration: ${videoDuration}s, current segments: ${this.segments.length}`)
       this.updateProgress(10 + (i / videoFiles.length) * 60)
@@ -114,12 +111,7 @@ export class VideoProcessor {
       this.segments.push(questionReadySegment)
       console.log(`Added question-ready segment for Q${questionNumber}, total segments: ${this.segments.length}`)
 
-      timestamps.push({
-        event: `Question ${questionNumber} Ready`,
-        time: currentTime,
-        duration: options.questionReadyDuration,
-        type: "question-ready",
-      })
+      // replaced by production timestamps generated after segments are built
 
       currentTime += options.questionReadyDuration
 
@@ -135,12 +127,7 @@ export class VideoProcessor {
       this.segments.push(questionSegment)
       console.log(`Added question video segment for Q${questionNumber}, total segments: ${this.segments.length}`)
 
-      timestamps.push({
-        event: `Question ${questionNumber} Video`,
-        time: currentTime,
-        duration: videoDuration,
-        type: "question",
-      })
+      // replaced by production timestamps generated after segments are built
 
       currentTime += videoDuration
 
@@ -154,12 +141,7 @@ export class VideoProcessor {
       }
       this.segments.push(timeStartsSegment)
 
-      timestamps.push({
-        event: "Time Starts",
-        time: currentTime,
-        duration: options.timeStartsDuration,
-        type: "time-starts",
-      })
+      // replaced by production timestamps generated after segments are built
 
       currentTime += options.timeStartsDuration
 
@@ -173,12 +155,7 @@ export class VideoProcessor {
       }
       this.segments.push(countdownSegment)
 
-      timestamps.push({
-        event: "Answer Countdown",
-        time: currentTime,
-        duration: options.countdownDuration,
-        type: "countdown",
-      })
+      // replaced by production timestamps generated after segments are built
 
       currentTime += options.countdownDuration
 
@@ -192,12 +169,7 @@ export class VideoProcessor {
       }
       this.segments.push(timeUpFetchingSegment)
 
-      timestamps.push({
-        event: "Time Up - Fetching Results",
-        time: currentTime,
-        duration: options.timeUpFetchingDuration,
-        type: "time-up-fetching",
-      })
+      // replaced by production timestamps generated after segments are built
 
       currentTime += options.timeUpFetchingDuration
 
@@ -211,12 +183,7 @@ export class VideoProcessor {
       }
       this.segments.push(leaderboardSegment)
 
-      timestamps.push({
-        event: "Leaderboard/Results",
-        time: currentTime,
-        duration: options.leaderboardDuration,
-        type: "leaderboard",
-      })
+      // replaced by production timestamps generated after segments are built
 
       currentTime += options.leaderboardDuration
 
@@ -234,11 +201,6 @@ export class VideoProcessor {
       `video_${Date.now()}`
     )
 
-    const questionVideos = videoFiles.map((_, index) => ({
-      duration: 30, // This should be the actual video duration - could be enhanced to get real duration
-      id: `question_${index + 1}`
-    }))
-
     const gameSession = timestampManager.generateTimestamps(questionVideos, {
       gameReadyDuration: options.gameReadyDuration,
       questionReadyDuration: options.questionReadyDuration,
@@ -248,9 +210,15 @@ export class VideoProcessor {
       leaderboardDuration: options.leaderboardDuration
     })
 
+    const timestamps: TimestampEvent[] = gameSession.events
+
+    // Convert canonical GameEvent[] (ms timestamps) into the flattened HH:MM:SS keyed array
+    const video_time_stamps = eventsToFlatTimestamps(timestamps)
+
     return {
       segments: this.segments,
       timestamps,
+      video_time_stamps,
       totalDuration: currentTime,
       gameSession, // Add the production-ready game session
     }

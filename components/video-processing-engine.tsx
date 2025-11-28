@@ -13,7 +13,7 @@ import { VideoProcessor } from "@/lib/video-processor"
 interface VideoProcessingEngineProps {
   videos: Array<{ id: string; file: File; name: string; size: number; duration?: number }>
   configuration: any
-  onComplete?: (result: Blob) => void
+  onComplete?: (result: Blob, meta?: { video_time_stamps?: Record<string, string>[]; gameSession?: any }) => void
   onProcessingStateChange?: (isProcessing: boolean) => void
 }
 
@@ -24,6 +24,7 @@ export function VideoProcessingEngine({ videos, configuration, onComplete, onPro
   const [currentStep, setCurrentStep] = useState("")
   const [processingComplete, setProcessingComplete] = useState(false)
   const [gameSession, setGameSession] = useState<any>(null)
+  const [generatedVideoTimeStamps, setGeneratedVideoTimeStamps] = useState<Record<string, string>[] | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const callbackSetRef = useRef(false)
   const processingStartedRef = useRef(false)
@@ -82,7 +83,7 @@ export function VideoProcessingEngine({ videos, configuration, onComplete, onPro
 
     try {
       console.log("[v0] Processing options being passed:", processingOptions)
-      const { segments, timestamps, totalDuration, gameSession } = await processor.processVideos(
+      const { segments, timestamps, video_time_stamps, totalDuration, gameSession } = await processor.processVideos(
         videos.map((v) => v.file),
         processingOptions,
       )
@@ -95,10 +96,11 @@ export function VideoProcessingEngine({ videos, configuration, onComplete, onPro
 
       // Store the game session for timestamp download
       setGameSession(gameSession)
+      setGeneratedVideoTimeStamps(video_time_stamps || null)
       setProcessingComplete(true)
 
       // Call the completion callback with the video blob
-      onComplete?.(outputBlob)
+      onComplete?.(outputBlob, { video_time_stamps: video_time_stamps || undefined, gameSession })
     } catch (error) {
       console.error("Processing failed:", error)
     } finally {
@@ -129,9 +131,11 @@ export function VideoProcessingEngine({ videos, configuration, onComplete, onPro
   const processingSteps = processor.getProcessingSteps()
 
   const handleDownloadTimestamps = () => {
-    if (!gameSession) return
+    // Prefer the full production `gameSession` if available, otherwise try the flattened timestamps
+    if (!gameSession && !generatedVideoTimeStamps) return
 
-    const timestampsJson = JSON.stringify(gameSession, null, 2)
+    const payload = gameSession ?? { video_time_stamps: generatedVideoTimeStamps }
+    const timestampsJson = JSON.stringify(payload, null, 2)
     const blob = new Blob([timestampsJson], { type: "application/json" })
     const url = URL.createObjectURL(blob)
     const a = document.createElement("a")

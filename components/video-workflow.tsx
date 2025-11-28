@@ -45,7 +45,7 @@ export type WorkflowStep =
   | "create-session";
 
 interface VideoWorkflowProps {
-  onComplete?: (result: Blob) => void;
+  onComplete?: (result: Blob, meta?: { video_time_stamps?: Record<string, string>[]; gameSession?: any }) => void;
   sessionData?: any; // Session data from the parent component
 }
 
@@ -170,9 +170,9 @@ export function VideoWorkflow({ onComplete, sessionData }: VideoWorkflowProps) {
     });
   };
   const handleWorkflowComplete = useCallback(
-    (result: Blob) => {
+    (result: Blob, meta?: { video_time_stamps?: Record<string, string>[]; gameSession?: any }) => {
       setProcessingResult(result);
-      onComplete?.(result);
+      onComplete?.(result, meta);
     },
     [onComplete]
   );

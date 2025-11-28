@@ -14,24 +14,43 @@ import { Download, Play, ArrowLeft, Upload } from "lucide-react";
 import { useGetSingleStreamSession } from "../misc/api/getSingleStreamSession";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { useCompileStreamSession, useInitSingleUpload, useCompleteUpload, useStartLiveSession, usePushStreamQuestion, usePushQuestionsTime, usePushQuestionEndTimer } from "../misc/api";
+import {
+  useCompileStreamSession,
+  useInitSingleUpload,
+  useCompleteUpload,
+  useStartLiveSession,
+  usePushStreamQuestion,
+  usePushQuestionsTime,
+  usePushQuestionEndTimer,
+} from "../misc/api";
 import HlsPlayer from "@/components/hls-player";
 import type { QuestionData } from "../misc/api/postPushStreamQuestion";
 
 export default function CreateStreamPage() {
   const [processingResult, setProcessingResult] = useState<Blob | null>(null);
+  const [processedVideoTimeStamps, setProcessedVideoTimeStamps] = useState<
+    Record<string, string>[] | null
+  >(null);
   const [uploadingCompiled, setUploadingCompiled] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
-  const [currentQuestion, setCurrentQuestion] = useState<QuestionData | null>(null);
+  const [currentQuestion, setCurrentQuestion] = useState<QuestionData | null>(
+    null
+  );
   const [questionIndex, setQuestionIndex] = useState<number | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const [timerState, setTimerState] = useState<'idle' | 'running' | 'ended'>('idle');
+  const [timerState, setTimerState] = useState<"idle" | "running" | "ended">(
+    "idle"
+  );
   const searchParams = useSearchParams();
   const router = useRouter();
   const sessionId = searchParams.get("sessionId");
-  
-  const { data: sessionData, isLoading, error } = useGetSingleStreamSession(sessionId || undefined);
+
+  const {
+    data: sessionData,
+    isLoading,
+    error,
+  } = useGetSingleStreamSession(sessionId || undefined);
   const initSingleUpload = useInitSingleUpload();
   const compileSession = useCompileStreamSession();
   const completeUpload = useCompleteUpload();
@@ -40,9 +59,20 @@ export default function CreateStreamPage() {
   const pushQuestionsTime = usePushQuestionsTime();
   const pushQuestionEndTimer = usePushQuestionEndTimer();
 
-  const handleWorkflowComplete = useCallback((result: Blob) => {
-    setProcessingResult(result);
-  }, []);
+  const handleWorkflowComplete = useCallback(
+    (
+      result: Blob,
+      meta?: {
+        video_time_stamps?: Record<string, string>[];
+        gameSession?: string | number;
+      }
+    ) => {
+      setProcessingResult(result);
+      if (meta?.video_time_stamps)
+        setProcessedVideoTimeStamps(meta.video_time_stamps);
+    },
+    []
+  );
 
   const handleDownload = useCallback(() => {
     if (!processingResult) return;
@@ -64,21 +94,23 @@ export default function CreateStreamPage() {
   // Timer functionality
   const startCountdownTimer = useCallback(() => {
     if (!currentQuestion) return;
-    
-    setTimerState('running');
+
+    setTimerState("running");
     setCountdown(10);
-    
+
     // Start the timer on backend
     pushQuestionsTime.mutate({ questionId: currentQuestion.question_id });
-    
+
     // Client-side countdown
     const timer = setInterval(() => {
       setCountdown((prev) => {
         if (prev === null || prev <= 1) {
           clearInterval(timer);
-          setTimerState('ended');
+          setTimerState("ended");
           // Auto-trigger end timer
-          pushQuestionEndTimer.mutate({ questionId: currentQuestion.question_id });
+          pushQuestionEndTimer.mutate({
+            questionId: currentQuestion.question_id,
+          });
           return 0;
         }
         return prev - 1;
@@ -87,25 +119,34 @@ export default function CreateStreamPage() {
   }, [currentQuestion, pushQuestionsTime, pushQuestionEndTimer]);
 
   const handleNextQuestion = useCallback(() => {
-    pushQuestion.mutate({ sessionId: sessionData?.id || 0 }, {
-      onSuccess: (data) => {
-        setCurrentQuestion(data.data.question);
-        setQuestionIndex(data.data.question_index);
-        setTimerState('idle');
-        setCountdown(null);
+    pushQuestion.mutate(
+      { sessionId: sessionData?.id || 0 },
+      {
+        onSuccess: (data) => {
+          setCurrentQuestion(data.data.question);
+          setQuestionIndex(data.data.question_index);
+          setTimerState("idle");
+          setCountdown(null);
+        },
       }
-    });
+    );
   }, [sessionData?.id, pushQuestion]);
 
   // Helper: upload Blob to S3 via our proxy
-  const uploadToS3ViaProxy = async (url: string, data: Blob, contentType?: string) => {
+  const uploadToS3ViaProxy = async (
+    url: string,
+    data: Blob,
+    contentType?: string
+  ) => {
     const proxyUrl = `/api/s3-upload-proxy?url=${encodeURIComponent(url)}`;
     const headers: Record<string, string> = {};
     if (contentType) headers["x-content-type"] = contentType;
     const res = await fetch(proxyUrl, { method: "POST", body: data, headers });
     if (!res.ok) {
       const txt = await res.text().catch(() => "");
-      throw new Error(`Proxy upload failed: ${res.status} ${res.statusText} - ${txt}`);
+      throw new Error(
+        `Proxy upload failed: ${res.status} ${res.statusText} - ${txt}`
+      );
     }
     return res.headers.get("ETag") || res.headers.get("etag") || null;
   };
@@ -133,10 +174,14 @@ export default function CreateStreamPage() {
       const filesize = processingResult.size;
 
       // 1) Init single upload to get presigned URL + asset_id
-      const initRes = await initSingleUpload.mutateAsync({ filename, filesize });
+      const initRes = await initSingleUpload.mutateAsync({
+        filename,
+        filesize,
+      });
       const { presigned_url, asset_id } = initRes.data;
 
-      if (!presigned_url) throw new Error("No presigned URL returned from init upload");
+      if (!presigned_url)
+        throw new Error("No presigned URL returned from init upload");
 
       // 2) Upload the compiled blob to S3 via proxy (set correct content type)
       const contentType = processingResult.type || "video/mp4";
@@ -153,14 +198,17 @@ export default function CreateStreamPage() {
           start_time: formatBackendDate(now),
           end_time: formatBackendDate(now),
           compiled_video_tag: `VID_${sessionData.id}`,
-          video_time_stamps: sessionData.video_time_stamps ?? {},
+          // Prefer timestamps generated by the processor if available, otherwise fall back to server session data
+          video_time_stamps:
+            processedVideoTimeStamps ?? sessionData.video_time_stamps ?? {},
           compiled_video_asset_id: asset_id,
         },
       });
 
       setUploadSuccess(true);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to upload compiled video";
+      const msg =
+        e instanceof Error ? e.message : "Failed to upload compiled video";
       setUploadError(msg);
     } finally {
       setUploadingCompiled(false);
@@ -187,7 +235,8 @@ export default function CreateStreamPage() {
             <CardHeader>
               <CardTitle className="text-red-600">Session Not Found</CardTitle>
               <CardDescription>
-                The session you&apos;re looking for doesn&apos;t exist or couldn&apos;t be loaded.
+                The session you&apos;re looking for doesn&apos;t exist or
+                couldn&apos;t be loaded.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -225,11 +274,19 @@ export default function CreateStreamPage() {
                   Create Stream - Session #{sessionData.id}
                 </h1>
                 <div className="flex items-center gap-2 mt-1">
-                  <Badge variant={sessionData.is_active ? "default" : "secondary"}>
+                  <Badge
+                    variant={sessionData.is_active ? "default" : "secondary"}
+                  >
                     {sessionData.is_active ? "Active" : "Inactive"}
                   </Badge>
-                  <Badge variant={sessionData.upload_completed ? "default" : "destructive"}>
-                    {sessionData.upload_completed ? "Upload Complete" : "Upload Pending"}
+                  <Badge
+                    variant={
+                      sessionData.upload_completed ? "default" : "destructive"
+                    }
+                  >
+                    {sessionData.upload_completed
+                      ? "Upload Complete"
+                      : "Upload Pending"}
                   </Badge>
                   <span className="text-sm text-muted-foreground">
                     {sessionData.total_questions} questions
@@ -252,7 +309,11 @@ export default function CreateStreamPage() {
                   disabled={uploadingCompiled}
                   className="flex items-center gap-2"
                 >
-                  <Upload className={`h-4 w-4 ${uploadingCompiled ? 'animate-pulse' : ''}`} />
+                  <Upload
+                    className={`h-4 w-4 ${
+                      uploadingCompiled ? "animate-pulse" : ""
+                    }`}
+                  />
                   {uploadingCompiled ? "Uploading..." : "Upload Compiled Video"}
                 </Button>
               </div>
@@ -265,7 +326,8 @@ export default function CreateStreamPage() {
           <CardHeader>
             <CardTitle>Session Information</CardTitle>
             <CardDescription>
-              Created on {new Date(sessionData.created_at).toLocaleDateString()} at {new Date(sessionData.created_at).toLocaleTimeString()}
+              Created on {new Date(sessionData.created_at).toLocaleDateString()}{" "}
+              at {new Date(sessionData.created_at).toLocaleTimeString()}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -284,13 +346,17 @@ export default function CreateStreamPage() {
               </div>
               <div>
                 <span className="font-medium">Video Asset:</span>
-                <div>{sessionData.compiled_video_asset_id ? "Available" : "Not generated"}</div>
+                <div>
+                  {sessionData.compiled_video_asset_id
+                    ? "Available"
+                    : "Not generated"}
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {sessionData.live_stream_url ? (
+        {sessionData.compiled_video_asset_id ? (
           <>
             {/* Live Stream Admin Panel */}
             <Card>
@@ -302,16 +368,21 @@ export default function CreateStreamPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  <HlsPlayer src={sessionData.live_stream_url} title={`Session #${sessionData.id} Live`} />
-                  
+                  <HlsPlayer
+                    src={sessionData.live_stream_url}
+                    title={`Session #${sessionData.id} Live`}
+                  />
+
                   {/* Current Question Display */}
                   {currentQuestion && (
                     <Card className="border-blue-200 bg-blue-50">
                       <CardHeader className="pb-3">
                         <div className="flex justify-between items-center">
-                          <CardTitle className="text-blue-800">Current Question #{questionIndex}</CardTitle>
+                          <CardTitle className="text-blue-800">
+                            Current Question #{questionIndex}
+                          </CardTitle>
                           <div className="flex gap-2">
-                            {timerState === 'idle' && (
+                            {timerState === "idle" && (
                               <Button
                                 onClick={startCountdownTimer}
                                 disabled={!currentQuestion}
@@ -321,22 +392,26 @@ export default function CreateStreamPage() {
                                 Start Timer
                               </Button>
                             )}
-                            {timerState === 'running' && (
+                            {timerState === "running" && (
                               <div className="flex items-center gap-2">
                                 <div className="bg-red-500 text-white px-3 py-1 rounded text-sm font-mono">
                                   {countdown}s
                                 </div>
-                                <span className="text-sm text-gray-600">Time remaining</span>
+                                <span className="text-sm text-gray-600">
+                                  Time remaining
+                                </span>
                               </div>
                             )}
-                            {timerState === 'ended' && (
+                            {timerState === "ended" && (
                               <Button
                                 onClick={handleNextQuestion}
                                 disabled={pushQuestion.isPending}
                                 size="sm"
                                 variant="default"
                               >
-                                {pushQuestion.isPending ? "Loading..." : "Next Question"}
+                                {pushQuestion.isPending
+                                  ? "Loading..."
+                                  : "Next Question"}
                               </Button>
                             )}
                           </div>
@@ -344,56 +419,87 @@ export default function CreateStreamPage() {
                       </CardHeader>
                       <CardContent>
                         <div className="space-y-3">
-                          <p className="font-medium text-gray-900">{currentQuestion.question}</p>
+                          <p className="font-medium text-gray-900">
+                            {currentQuestion.question}
+                          </p>
                           <div className="grid grid-cols-2 gap-2 text-sm">
                             <div className="p-2 bg-white rounded border">
-                              <span className="font-medium text-blue-600">A:</span> {currentQuestion.option_a}
+                              <span className="font-medium text-blue-600">
+                                A:
+                              </span>{" "}
+                              {currentQuestion.option_a}
                             </div>
                             <div className="p-2 bg-white rounded border">
-                              <span className="font-medium text-blue-600">B:</span> {currentQuestion.option_b}
+                              <span className="font-medium text-blue-600">
+                                B:
+                              </span>{" "}
+                              {currentQuestion.option_b}
                             </div>
                             <div className="p-2 bg-white rounded border">
-                              <span className="font-medium text-blue-600">C:</span> {currentQuestion.option_c}
+                              <span className="font-medium text-blue-600">
+                                C:
+                              </span>{" "}
+                              {currentQuestion.option_c}
                             </div>
                             <div className="p-2 bg-white rounded border">
-                              <span className="font-medium text-blue-600">D:</span> {currentQuestion.option_d}
+                              <span className="font-medium text-blue-600">
+                                D:
+                              </span>{" "}
+                              {currentQuestion.option_d}
                             </div>
                           </div>
                         </div>
                       </CardContent>
                     </Card>
                   )}
-                  
+
                   <div className="flex gap-3">
                     <Button
-                      onClick={() => startLive.mutate({ sessionId: sessionData.id })}
+                      onClick={() =>
+                        startLive.mutate({ sessionId: sessionData.id })
+                      }
                       disabled={startLive.isPending}
                     >
-                      {startLive.isPending ? "Starting..." : "Start Live Session"}
+                      {startLive.isPending
+                        ? "Starting..."
+                        : "Start Live Session"}
                     </Button>
                     <Button
-                      onClick={() => pushQuestion.mutate({ sessionId: sessionData.id }, {
-                        onSuccess: (data) => {
-                          setCurrentQuestion(data.data.question);
-                          setQuestionIndex(data.data.question_index);
-                        }
-                      })}
+                      onClick={() =>
+                        pushQuestion.mutate(
+                          { sessionId: sessionData.id },
+                          {
+                            onSuccess: (data) => {
+                              setCurrentQuestion(data.data.question);
+                              setQuestionIndex(data.data.question_index);
+                            },
+                          }
+                        )
+                      }
                       disabled={pushQuestion.isPending}
                       variant="outline"
                     >
                       {pushQuestion.isPending ? "Pushing..." : "Push Question"}
                     </Button>
                     {startLive.isSuccess && (
-                      <span className="text-sm text-green-600">Live session started.</span>
+                      <span className="text-sm text-green-600">
+                        Live session started.
+                      </span>
                     )}
                     {startLive.isError && (
-                      <span className="text-sm text-red-600">Failed to start live session.</span>
+                      <span className="text-sm text-red-600">
+                        Failed to start live session.
+                      </span>
                     )}
                     {pushQuestion.isSuccess && (
-                      <span className="text-sm text-green-600">Question pushed successfully.</span>
+                      <span className="text-sm text-green-600">
+                        Question pushed successfully.
+                      </span>
                     )}
                     {pushQuestion.isError && (
-                      <span className="text-sm text-red-600">Failed to push question.</span>
+                      <span className="text-sm text-red-600">
+                        Failed to push question.
+                      </span>
                     )}
                   </div>
                 </div>
@@ -403,15 +509,21 @@ export default function CreateStreamPage() {
         ) : (
           <>
             {/* Main Workflow */}
-            <VideoWorkflow onComplete={handleWorkflowComplete} sessionData={sessionData} />
+            <VideoWorkflow
+              onComplete={handleWorkflowComplete}
+              sessionData={sessionData}
+            />
 
             {/* Success Message */}
             {processingResult && (
               <Card className="mt-8 border-green-200 bg-green-50">
                 <CardHeader>
-                  <CardTitle className="text-green-800">Video Processing Complete!</CardTitle>
+                  <CardTitle className="text-green-800">
+                    Video Processing Complete!
+                  </CardTitle>
                   <CardDescription className="text-green-600">
-                    Video has been successfully compiled and is ready for download.
+                    Video has been successfully compiled and is ready for
+                    download.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -420,9 +532,14 @@ export default function CreateStreamPage() {
                       <Download className="h-4 w-4 mr-2" />
                       Download Final Video
                     </Button>
-                    <Button onClick={handleUploadCompiled} disabled={uploadingCompiled}>
+                    <Button
+                      onClick={handleUploadCompiled}
+                      disabled={uploadingCompiled}
+                    >
                       <Upload className="h-4 w-4 mr-2" />
-                      {uploadingCompiled ? "Uploading..." : "Upload Compiled Video"}
+                      {uploadingCompiled
+                        ? "Uploading..."
+                        : "Upload Compiled Video"}
                     </Button>
                   </div>
                   {uploadError && (
