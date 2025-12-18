@@ -20,6 +20,7 @@ import { useMQTT } from "@/hooks/useMqttService";
 import { StatusBadge } from "../components/StatusBadge";
 import { DataGrid, DataPoint } from "../components/DataGrid";
 import { TallyModal } from "../components/TallyModal";
+import { MobileBubbleOverlay } from "../components/MobileBubbleOverlay";
 import type { QuestionTallyResponse } from "../misc/api/quizHostApi";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
@@ -519,6 +520,11 @@ export default function QuizDetailPage() {
                     muted
                     playsInline
                     autoPlay
+                  />
+                  <MobileBubbleOverlay
+                    className="absolute inset-0"
+                    type="golden_hour"
+                    quizId={quizId}
                   />
                   {!isJoined && (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/70 text-center">
