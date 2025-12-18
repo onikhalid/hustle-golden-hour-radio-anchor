@@ -23,6 +23,7 @@ import { TallyModal } from "../components/TallyModal";
 import type { QuestionTallyResponse } from "../misc/api/quizHostApi";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
+import { useEndQuiz } from "../misc/api";
 
 const cardBase =
   "rounded-3xl border border-white/10 bg-white/[0.04] px-4 py-3.5 md:p-5";
@@ -36,7 +37,7 @@ type ControlButton = {
 };
 
 const controlButtonBase =
-  "flex flex-col justify-center rounded-lg md:rounded-2xl px-2 py-1.5 md:px-4 md:py-3 text-left text-sm font-semibold transition duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-50";
+  "flex flex-col justify-center rounded-lg md:rounded-2xl cursor-pointer px-2 py-1.5 md:px-4 md:py-3 text-left text-sm font-semibold transition duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-50";
 
 const controlVariants: Record<NonNullable<ControlButton["variant"]>, string> = {
   primary:
@@ -170,14 +171,6 @@ export default function QuizDetailPage() {
         console.error(err);
         addLog("Failed to leave real-time stage.");
       }
-
-      try {
-        await stopQuizBroadcast.mutateAsync(quizId);
-        addLog("Broadcast stop signal sent.");
-      } catch (err) {
-        console.error(err);
-        addLog("Failed to notify backend to stop broadcast.");
-      }
     } finally {
       setLoading(false);
     }
@@ -309,11 +302,14 @@ export default function QuizDetailPage() {
   };
 
   // End entire quiz session
+  const {mutate: endQuizMutate} = useEndQuiz()
   const handleEndQuiz = async () => {
     setLoading(true);
     try {
+      handleStopStream();
       await sendMessage({ event: "quiz_session_end" });
       addLog("Quiz session end signal sent.");
+      endQuizMutate(quizId);
       setIsTallyModalOpen(false);
       setRoundTally(null);
     } catch {
@@ -459,8 +455,7 @@ export default function QuizDetailPage() {
               </Link>
               <div>
                 <h1 className="sm:text-2xl md:text-3xl font-semibold text-white/90 truncate ">
-                  {/* {quizData?.data?.name || `Quiz ${quizId}`} */}
-                  Early Santa Liberty
+                  {quizData?.data?.name || `Quiz ${quizId}`}
                 </h1>
               </div>
             </div>

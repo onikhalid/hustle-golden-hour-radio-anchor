@@ -34,23 +34,7 @@ export default function HostQuizList() {
 
   return (
     <div className=" min-h-screen">
-      <div className="flex flex-col items-center justify-center pt-8 relative z-[5]">
-        <h2
-          className="md:text-[48px] text-xl font-black text-white relative leading-none"
-          style={{
-            // fontFamily: "Wix Madefor Display",
-            textShadow: `
-              -3px -3px 0 #840045,
-              3px 3px 0 #FFC700
-            `,
-          }}
-        >
-          Golden Hour
-        </h2>
-        <p className="md:text-base text-xs text-white font-gilroy-medium pt-[0.75rem]">
-          Join live quizzes to win big!
-        </p>
-      </div>
+   
 
       <section className="max-w-6xl mx-auto px-4 py-6 flex items-center">
         <button
@@ -90,7 +74,10 @@ export default function HostQuizList() {
                     />
                   </svg>
 
-                  <span className="font-medium">{quiz.game_code}</span>
+                  <span className="font-medium">
+                    {quiz.name ?? quiz.game_code}
+                    
+                  </span>
                 </h2>
                 <button
                   onClick={() => {}}

@@ -54,6 +54,11 @@ export default function MainLayout({ children }: MainLayoutProps) {
 		router.push("/login");
 	};
 
+
+
+
+    
+
 	return (
 		<div className="relative min-h-screen overflow-hidden bg-[url('/images/bg/hustle-bg.png')] bg-cover bg-center">
 			<div className="absolute inset-0 bg-black/70" />
@@ -62,7 +67,6 @@ export default function MainLayout({ children }: MainLayoutProps) {
 				<header className="mx-4 mt-6 rounded-3xl border border-white/10 bg-white/[0.07] px-6 py-4 shadow-[0_40px_120px_-80px_rgba(5,0,20,0.9)] backdrop-blur-xl md:mx-8">
 					<div className="flex items-center justify-between gap-6">
 						<div className="flex flex-col gap-1 text-white/80">
-							<span className="text-xs uppercase tracking-[0.3em] text-white/50">Golden Hour</span>
 							<h1 className="text-lg font-semibold text-white md:text-xl">
 								Control Center
 							</h1>
