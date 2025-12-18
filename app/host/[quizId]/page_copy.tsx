@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 import {
@@ -9,14 +9,12 @@ import {
   useStartQuestionTime,
   useRetrieveQuiz,
   useElapseQuestionTime,
+  useQuizStartDetails,
   useStopQuizBroadcast,
-  useRealtimeStageDetails,
-  useHostRealtimeToken,
-  useCreateHostRealtimeToken,
 } from "../misc/api/quizHostApi";
 import { getQuestionResultsTally } from "../misc/api/quizHostApi";
 
-import { useIVSRealtimeStage } from "@/hooks/useIVSRealtimeStage";
+import { useIVSBroadcast } from "@/hooks/useIVSBroadcast";
 import { useMQTT } from "@/hooks/useMqttService";
 
 export default function QuizDetailPage() {
@@ -24,7 +22,7 @@ export default function QuizDetailPage() {
   const router = useRouter();
   const quizId = params.quizId as string;
 
-  const { data: stageDetails } = useRealtimeStageDetails(quizId);
+  const { data: startDetails } = useQuizStartDetails(quizId);
 
   const [question, setQuestion] = useState<any>(null);
   const [questionIndex, setQuestionIndex] = useState<number>(1);
@@ -44,97 +42,77 @@ export default function QuizDetailPage() {
   const stopQuizBroadcast = useStopQuizBroadcast();
   const { data: quizData, isLoading: loadingQuiz } = useRetrieveQuiz(quizId);
 
-  const hostToken = useHostRealtimeToken();
-  const { joinStage, leaveStage, localStream, remoteParticipants, isJoined } =
-    useIVSRealtimeStage();
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    const videoEl = localVideoRef.current;
-    if (!videoEl) return;
-
-    if (!localStream) {
-      videoEl.srcObject = null;
-      return;
-    }
-
-    videoEl.srcObject = localStream;
-    videoEl.muted = true;
-    videoEl.playsInline = true;
-    videoEl.autoplay = true;
-
-    const playPromise = videoEl.play();
-    if (playPromise !== undefined) {
-      playPromise.catch(() => {
-        // Autoplay rejection can be ignored; the user can tap to resume.
-      });
-    }
-  }, [localStream]);
-
-  useEffect(() => {
-    return () => {
-      void leaveStage();
-    };
-  }, [leaveStage]);
+  const { startBroadcast, stopBroadcast } = useIVSBroadcast();
+  const previewCanvasRef = useRef<HTMLCanvasElement>(null);
 
   // Helper: log events
   const addLog = (msg: string) => setLog((prev) => [msg, ...prev.slice(0, 9)]);
 
   const handleGoLive = async () => {
-    if (isJoined) {
-      addLog("Already connected to IVS real-time stage.");
+    if (!previewCanvasRef.current) {
+      addLog("Preview unavailable. Try reloading the page.");
       return;
     }
 
-    if (stageDetails && !stageDetails.data?.stage_arn) {
-      addLog("Stage details unavailable. Ensure the real-time stage exists.");
+    const ingestServer = startDetails?.data?.ingest_server;
+    const streamKey = startDetails?.data?.stream_key;
+
+    if (!ingestServer || !streamKey) {
+      addLog("Stream credentials missing. Check quiz settings.");
       return;
     }
 
-    setLoading(true);
     try {
-      const tokenPayload = await hostToken.mutateAsync(
-        quizId
-      );
-      const token = tokenPayload?.data?.participant_token?.token;
+      const mediaDevices = navigator.mediaDevices;
 
-      if (!token) {
-        addLog("Failed to retrieve host participant token.");
+      if (!mediaDevices?.getUserMedia) {
+        addLog("Media devices API unavailable on this browser.");
         return;
       }
 
-      await joinStage(token);
-      addLog("Joined IVS real-time stage.");
+      if (typeof mediaDevices.enumerateDevices === "function") {
+        try {
+          const devices = await mediaDevices.enumerateDevices();
+          const hasCamera = devices.some((d) => d.kind === "videoinput");
+          const hasMic = devices.some((d) => d.kind === "audioinput");
+
+          if (!hasCamera || !hasMic) {
+            addLog("Camera or microphone not reported. Attempting capture anyway.");
+          }
+        } catch (enumerateErr) {
+          console.warn("enumerateDevices failed", enumerateErr);
+          addLog("Unable to list devices. Attempting capture...");
+        }
+      }
+
+      await startBroadcast(ingestServer, streamKey, previewCanvasRef.current);
+      addLog("Broadcast started");
     } catch (err) {
       console.error(err);
-      addLog("Failed to join real-time stage.");
+      addLog("Failed to start broadcast. Check console for details.");
       addLog(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
     }
   };
 
   const handleStopStream = async () => {
     setLoading(true);
+   
     try {
-      try {
-        await leaveStage();
-        addLog("Left IVS real-time stage.");
-      } catch (err) {
-        console.error(err);
-        addLog("Failed to leave real-time stage.");
-      }
-
-      try {
-        await stopQuizBroadcast.mutateAsync(quizId);
-        addLog("Broadcast stop signal sent.");
-      } catch (err) {
-        console.error(err);
-        addLog("Failed to notify backend to stop broadcast.");
-      }
-    } finally {
-      setLoading(false);
+      await stopBroadcast();
+      addLog("Broadcast stopped.");
+    } catch (err) {
+      console.error(err);
+      addLog("Failed to stop local broadcast.");
     }
+
+     try {
+      await stopQuizBroadcast.mutateAsync(quizId);
+      addLog("Broadcast stop signal sent.");
+    } catch (err) {
+      console.error(err);
+      addLog("Failed to notify backend to stop broadcast.");
+    }
+    setLoading(false);
   };
 
   // Start quiz
@@ -310,18 +288,6 @@ export default function QuizDetailPage() {
                 <span className="font-semibold">Anchor:</span>{" "}
                 {quizData.data.anchor_name || "N/A"}
               </div>
-              {stageDetails?.data?.name && (
-                <div>
-                  <span className="font-semibold">Stage:</span>{" "}
-                  {stageDetails.data.name}
-                </div>
-              )}
-              {stageDetails?.data?.stage_arn && (
-                <div className="col-span-2 break-words">
-                  <span className="font-semibold">Stage ARN:</span>{" "}
-                  {stageDetails.data.stage_arn}
-                </div>
-              )}
               <div>
                 <span className="font-semibold">MQTT:</span>{" "}
                 <span
@@ -382,76 +348,24 @@ export default function QuizDetailPage() {
       </div>
       <div className="w-full max-w-4xl mx-auto mb-4">
         <div className="relative w-full rounded-lg overflow-hidden bg-black pb-[56.25%]">
-          <video
-            ref={localVideoRef}
-            className="absolute inset-0 h-full w-full object-cover bg-black"
-            muted
-            playsInline
-            autoPlay
+          <canvas
+            ref={previewCanvasRef}
+            className="absolute inset-0 h-full w-full"
           />
-          {!isJoined && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/60 text-sm text-gray-300">
-              Preview inactive
-            </div>
-          )}
-        </div>
-        <div className="mt-2 text-center text-xs text-gray-500">
-          {isJoined
-            ? "You are live on the IVS real-time stage."
-            : "Select Go Live to join the IVS real-time stage."}
         </div>
       </div>
-
-      {remoteParticipants.length > 0 && (
-        <div className="mb-6">
-          <div className="font-semibold mb-2">Remote Participants</div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {remoteParticipants.map((participant) => (
-              <div
-                key={participant.participantId}
-                className="relative w-full rounded-lg overflow-hidden bg-black pb-[56.25%]"
-              >
-                <video
-                  className="absolute inset-0 h-full w-full object-cover bg-black"
-                  playsInline
-                  autoPlay
-                  ref={(videoEl) => {
-                    if (videoEl && participant.mediaStream) {
-                      if (videoEl.srcObject !== participant.mediaStream) {
-                        videoEl.srcObject = participant.mediaStream;
-                      }
-                      videoEl.muted = false;
-                      const playPromise = videoEl.play();
-                      if (playPromise !== undefined) {
-                        playPromise.catch(() => {
-                          // Ignore autoplay errors for remote feeds.
-                        });
-                      }
-                    }
-                  }}
-                />
-                <span className="absolute bottom-2 left-2 rounded bg-black/60 px-2 py-1 text-[10px] uppercase tracking-wide text-white">
-                  {participant.participantId}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="mb-6 flex flex-wrap gap-2">
         <button
           onClick={handleGoLive}
-          className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold disabled:opacity-60"
-          disabled={loading || isJoined}
+          className="bg-green-600 text-white px-6 py-3 rounded-lg font-semibold"
         >
           Go Live
         </button>
 
         <button
           onClick={handleStopStream}
-          className="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold disabled:opacity-60"
-          disabled={loading || !isJoined}
+          className="bg-red-600 text-white px-6 py-3 rounded-lg font-semibold"
         >
           Stop Stream
         </button>

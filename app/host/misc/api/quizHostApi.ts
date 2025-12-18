@@ -59,6 +59,38 @@ export const useStopQuizBroadcast = () => {
   });
 };
 
+const getRealtimeStageDetails = async (id: string | number) => {
+  const res = await gameAxios.get(`/quiz/realtime/stage/details/${id}`);
+  return res.data;
+};
+export const useRealtimeStageDetails = (id?: string | number) => {
+  return useQuery({
+    queryFn: () => getRealtimeStageDetails(id!),
+    queryKey: ["quiz-realtime-stage-details", id],
+    enabled: !!id,
+  });
+};
+
+const getHostRealtimeToken = async (id: string | number) => {
+  const res = await gameAxios.post(`/quiz/realtime/token/host/${id}`);
+  return res.data;
+};
+export const useHostRealtimeToken = () => {
+  return useMutation({
+    mutationFn: (id: string | number) => getHostRealtimeToken(id),
+  });
+};
+
+const createHostRealtimeToken = async (id: string | number) => {
+  const res = await gameAxios.post(`/quiz/realtime/create/`);
+  return res.data;
+};
+export const useCreateHostRealtimeToken = () => {
+  return useMutation({
+    mutationFn: (id: string | number) => createHostRealtimeToken(id),
+  });
+};
+
 export const getQuestionResultsTally = async (id: string | number) => {
   const res = await gameAxios.get(`/quiz/question/tally/${id}`);
   return res.data;
@@ -70,6 +102,10 @@ export const useGetQuestionResultsTally = (id?: string | number) => {
     enabled: !!id,
   });
 };
+
+
+
+
 
 interface QuizzesListResponse {
   count: number;
