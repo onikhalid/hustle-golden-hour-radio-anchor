@@ -1,5 +1,4 @@
 import { AblyContext, AblyMessage } from "@/contexts/AblyProvider";
-import { useParams } from "next/navigation";
 import { useContext, useEffect, useCallback, useState, useRef } from "react";
 
 // Hook return types
