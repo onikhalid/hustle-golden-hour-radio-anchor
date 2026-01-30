@@ -23,15 +23,15 @@ export default function LoginPage() {
     setError(null);
     const payload: any = { password };
     if (phoneOrEmail.includes("@")) payload.email = phoneOrEmail;
-    else payload.phone_number = phoneOrEmail;
+    else payload.username = phoneOrEmail;
 
     credentialsLoginMutation.mutate(payload, {
       onSuccess: (data) => {
-        tokenStorage.setToken(data.tokens.access);
-        setAxiosDefaultToken(data.tokens.access, gameAxios);
+        tokenStorage.setToken(data.token);
+        setAxiosDefaultToken(data.token, gameAxios);
         router.push("/host");
       },
-      onError: (err) => {
+      onError: (err) => { 
         setError(formatAxiosErrorMessage(err as AxiosError) ?? "");
       },
     });

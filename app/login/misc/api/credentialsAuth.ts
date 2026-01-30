@@ -14,7 +14,7 @@ interface RegisterPayload {
 }
 
 interface LoginPayload {
-  phone_number?: string;
+  username?: string;
   email?: string;
   password: string;
 }
@@ -22,16 +22,13 @@ interface LoginPayload {
 const registerUser = async (payload: RegisterPayload) => {
   const { data } = await tokenlessAxios.post(
     "/api/accounts/user/register/",
-    payload
+    payload,
   );
   return data;
 };
 
 const loginUser = async (payload: LoginPayload) => {
-  const { data } = await tokenlessAxios.post(
-    "/api/accounts/user/login/",
-    payload
-  );
+  const { data } = await tokenlessAxios.post("/api/web/login/", payload);
   return data as APIResponse;
 };
 
@@ -51,14 +48,7 @@ export const useRegister = () => {
 };
 
 interface APIResponse {
-  status: string;
-  message: string;
-  tokens: Tokens;
-}
-
-interface Tokens {
-  refresh: string;
-  access: string;
+  token: string;
 }
 
 export const useCredentialsLogin = () => {
@@ -77,7 +67,7 @@ export const useCredentialsLogin = () => {
     },
     onSuccess: async (data) => {
       console.log(data, "DATTAA");
-      const token = data?.tokens?.access;
+      const token = data?.token;
       if (!token) {
         console.warn("No token returned from login — response shape:", data);
         authDispatch?.({ type: "STOP_LOADING" });
