@@ -6,6 +6,10 @@ import {
   AssignQuestionData,
   UpdateQuestionData,
   CategoryData,
+  Question,
+  CreateQuestionData,
+  CreateSessionData,
+  SessionData,
 } from "../types/dashboard.types";
 import { tokenStorage } from "../tokens";
 
@@ -181,6 +185,150 @@ export async function updateQuestion(
         error.response?.data?.message ||
         error.message ||
         "Failed to update question",
+    };
+  }
+}
+
+/**
+ * List all questions
+ */
+export async function listQuestions(): Promise<ApiResponse<Question[]>> {
+  try {
+    const response = await apiClient.get(
+      "/api/v1/golden_hour_quiz/questions/list/",
+      {
+        params: {
+          "X-Company-Code": "RTM",
+          "X-Secret-Key": "S92PS48OE3",
+        },
+        headers: {
+          Authorization: `Bearer ${token || "14bee5e7ef2d5124ee8fd1d1d1840c28f8a29ec1"}`,
+        },
+      },
+    );
+    return {
+      success: true,
+      data: response.data.data || [],
+      message: response.data.message || "Questions fetched successfully",
+    };
+  } catch (error: any) {
+    console.error("Error fetching questions:", error);
+    return {
+      success: false,
+      error:
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to fetch questions",
+    };
+  }
+}
+
+/**
+ * Create a new question
+ */
+export async function createQuestion(
+  data: CreateQuestionData,
+): Promise<ApiResponse> {
+  try {
+    const response = await apiClient.post(
+      "/api/v1/golden_hour_quiz/questions/create/",
+      data,
+      {
+        params: {
+          "X-Company-Code": "RTM",
+          "X-Secret-Key": "S92PS48OE3",
+        },
+        headers: {
+          Authorization: `Bearer ${token || "14bee5e7ef2d5124ee8fd1d1d1840c28f8a29ec1"}`,
+        },
+      },
+    );
+    return {
+      success: true,
+      data: response.data,
+      message: "Question created successfully",
+    };
+  } catch (error: any) {
+    console.error("Error creating question:", error);
+    return {
+      success: false,
+      error:
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to create question",
+    };
+  }
+}
+/**
+ * Create a new quiz session
+ */
+export async function createSession(
+  data: CreateSessionData,
+): Promise<ApiResponse> {
+  try {
+    const response = await apiClient.post(
+      "/api/v1/golden_hour_quiz/sessions/create/",
+      data,
+      {
+        params: {
+          "X-Company-Code": "RTM",
+          "X-Secret-Key": "S92PS48OE3",
+        },
+        headers: {
+          Authorization: `Bearer ${token || "14bee5e7ef2d5124ee8fd1d1d1840c28f8a29ec1"}`,
+        },
+      },
+    );
+    return {
+      success: true,
+      data: response.data,
+      message: "Session created successfully",
+    };
+  } catch (error: any) {
+    console.error("Error creating session:", error);
+    return {
+      success: false,
+      error:
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to create session",
+    };
+  }
+}
+
+/**
+ * Fetch session details by ID
+ */
+export async function getSessionDetails(
+  sessionId: string | number,
+): Promise<ApiResponse<SessionData>> {
+  try {
+    const response = await apiClient.get(
+      `/api/v1/golden_hour_quiz/sessions/${sessionId}/`,
+      {
+        params: {
+          "X-Company-Code": "RTM",
+          "X-Secret-Key": "S92PS48OE3",
+        },
+        headers: {
+          Authorization: `Bearer ${token || "14bee5e7ef2d5124ee8fd1d1d1840c28f8a29ec1"}`,
+        },
+      },
+    );
+    // API returns {success, message, data: {...}}
+    return {
+      success: true,
+      data: response.data.data,
+      message: response.data.message || "Session details fetched successfully",
+    };
+  } catch (error: any) {
+    console.error("Error fetching session details:", error);
+    return {
+      success: false,
+      error:
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to fetch session details",
     };
   }
 }

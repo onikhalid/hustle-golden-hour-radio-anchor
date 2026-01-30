@@ -1,1 +1,0 @@
-export { useEndQuiz } from "./getQuizResults";

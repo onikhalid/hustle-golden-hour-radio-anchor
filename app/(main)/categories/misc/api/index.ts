@@ -6,7 +6,7 @@ export async function createCategory(data: {
   name: string;
 }): Promise<ApiResponse> {
   try {
-    const response = await apiClient.put(
+    const response = await apiClient.post(
       "/api/v1/golden_hour_quiz/categories/create/",
       data,
       {
@@ -14,24 +14,21 @@ export async function createCategory(data: {
           "X-Company-Code": "RTM",
           "X-Secret-Key": "S92PS48OE3",
         },
-        // headers: {
-        //   Authorization: `Bearer ${token || "14bee5e7ef2d5124ee8fd1d1d1840c28f8a29ec1"}`,
-        // },
       },
     );
     return {
       success: true,
       data: response.data,
-      message: "Question created successfully",
+      message: "Category created successfully",
     };
   } catch (error: any) {
-    console.error("Error creating question:", error);
+    console.error("Error creating category:", error);
     return {
       success: false,
       error:
         error.response?.data?.message ||
         error.message ||
-        "Failed to create question",
+        "Failed to create category",
     };
   }
 }

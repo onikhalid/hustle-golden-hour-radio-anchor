@@ -1,11 +1,17 @@
 "use client";
 
 import React, { useState } from "react";
-import { useCreateLiveQuiz, useListQuizSessions } from "./misc/api/quizHostApi";
+import {
+  useCreateLiveQuiz,
+  useListQuizSessions,
+} from "../sessions/[id]/anchor/misc/api/quizHostApi";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import GradientButton from "@/components/ui/GradientButton";
-import { CreateQuizModal, CreateQuizFormValues } from "./components/CreateQuizModal";
+import {
+  CreateQuizModal,
+  CreateQuizFormValues,
+} from "../sessions/[id]/anchor/misc/components/CreateQuizModal";
 
 export default function HostQuizList() {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -34,8 +40,6 @@ export default function HostQuizList() {
 
   return (
     <div className=" min-h-screen">
-   
-
       <section className="max-w-6xl mx-auto px-4 py-6 flex items-center">
         <button
           onClick={handleCreateQuiz}
@@ -76,7 +80,6 @@ export default function HostQuizList() {
 
                   <span className="font-medium">
                     {quiz.name ?? quiz.game_code}
-                    
                   </span>
                 </h2>
                 <button

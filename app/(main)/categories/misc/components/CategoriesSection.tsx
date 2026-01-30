@@ -33,7 +33,10 @@ export default function CategoriesSection() {
   const { mutate, isPending: isCreatingCategory } = useCreateCategory();
   const handleCreateCategory = (data: { name: string }) => {
     mutate(data, {
-      onSuccess() {},
+      onSuccess() {
+        setCreateModalOpen(false);
+        refetch();
+      },
     });
   };
 
@@ -52,7 +55,7 @@ export default function CategoriesSection() {
 
         <div className="flex items-center gap-4">
           <button
-            onClick={() => refetch()}
+            onClick={() => setCreateModalOpen(true)}
             disabled={isFetching}
             className="flex items-center gap-2 rounded-xl bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:opacity-50"
           >

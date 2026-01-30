@@ -12,19 +12,22 @@ import {
   useStopQuizBroadcast,
   useRealtimeStageDetails,
   useHostRealtimeToken,
-} from "../misc/api/quizHostApi";
-import { getQuestionResultsTally } from "../misc/api/quizHostApi";
+} from "../../sessions/[id]/anchor/misc/api/quizHostApi";
+import { getQuestionResultsTally } from "../../sessions/[id]/anchor/misc/api/quizHostApi";
 
 import { useIVSRealtimeStage } from "@/hooks/useIVSRealtimeStage";
-import { useMQTT } from "@/hooks/useMqttService";
-import { StatusBadge } from "../components/StatusBadge";
-import { DataGrid, DataPoint } from "../components/DataGrid";
-import { TallyModal } from "../components/TallyModal";
-import { MobileBubbleOverlay } from "../components/MobileBubbleOverlay";
-import type { QuestionTallyResponse } from "../misc/api/quizHostApi";
+import { useAbly } from "@/hooks/useMqttService";
+import { StatusBadge } from "../../sessions/[id]/anchor/misc/components/StatusBadge";
+import {
+  DataGrid,
+  DataPoint,
+} from "../../sessions/[id]/anchor/misc/components/DataGrid";
+import { TallyModal } from "../../sessions/[id]/anchor/misc/components/TallyModal";
+import { MobileBubbleOverlay } from "../../sessions/[id]/anchor/misc/components/MobileBubbleOverlay";
+import type { QuestionTallyResponse } from "../../sessions/[id]/anchor/misc/api/quizHostApi";
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
-import { useEndQuiz } from "../misc/api";
+import { useEndQuiz } from "../../sessions/[id]/anchor/misc/api";
 
 const cardBase =
   "rounded-3xl border border-white/10 bg-white/[0.04] px-4 py-3.5 md:p-5";
@@ -64,10 +67,12 @@ export default function QuizDetailPage() {
   const [correctOption, setCorrectOption] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [log, setLog] = useState<string[]>([]);
-  const [roundTally, setRoundTally] = useState<QuestionTallyResponse["data"] | null>(null);
+  const [roundTally, setRoundTally] = useState<
+    QuestionTallyResponse["data"] | null
+  >(null);
   const [isTallyModalOpen, setIsTallyModalOpen] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const { isConnected, sendMessage } = useMQTT();
+  const { isConnected, sendMessage } = useAbly();
 
   // API hooks
   const startQuiz = useStartQuizGame();
@@ -280,7 +285,6 @@ export default function QuizDetailPage() {
     setLoading(false);
   };
 
-  
   const handleManualTally = async () => {
     if (!question) return;
     setLoading(true);
@@ -303,7 +307,7 @@ export default function QuizDetailPage() {
   };
 
   // End entire quiz session
-  const {mutate: endQuizMutate} = useEndQuiz()
+  const { mutate: endQuizMutate } = useEndQuiz();
   const handleEndQuiz = async () => {
     setLoading(true);
     try {
@@ -462,7 +466,7 @@ export default function QuizDetailPage() {
             </div>
             <div className="flex flex-wrap items-center gap-1 md:gap-3 shrink-0">
               <StatusBadge
-                label="MQTT"
+                label="Ably"
                 value={isConnected ? "Online" : "Offline"}
                 tone={isConnected ? "success" : "danger"}
               />
@@ -482,7 +486,7 @@ export default function QuizDetailPage() {
               <DataGrid points={metadata} />
             </div>
           )}
-{/* 
+          {/* 
           {stageDetails?.data?.stage_arn && (
             <div className="mt-4 rounded-2xl border border-white/5 bg-white/[0.03] p-4 text-xs text-white/60 max-md:!hidden">
               <span className="font-semibold text-white/70">Stage ARN:</span>
@@ -600,13 +604,14 @@ export default function QuizDetailPage() {
             </p>
           </section>
 
-          <section className={`${cardBase} order-2 flex flex-col gap-2.5 md:gap-5`}>
+          <section
+            className={`${cardBase} order-2 flex flex-col gap-2.5 md:gap-5`}
+          >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/50">
                   Question feed
                 </h2>
-              
               </div>
               {question && (
                 <span className="rounded-full bg-indigo-500/20 px-4 py-1 text-xs font-semibold text-indigo-200">
@@ -641,7 +646,7 @@ export default function QuizDetailPage() {
                           {question[optionKey]}
                         </div>
                       );
-                    }
+                    },
                   )}
                 </div>
                 {correctOption && (
@@ -729,7 +734,7 @@ export default function QuizDetailPage() {
               <li>
                 Advance in the order: send question → start timer → send tally.
               </li>
-              <li>Use the log to confirm MQTT events land as expected.</li>
+              <li>Use the log to confirm Ably events land as expected.</li>
               <li>
                 Stop stream before leaving the stage to avoid surprise
                 broadcasts.

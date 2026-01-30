@@ -1,23 +1,22 @@
 import Axios from "axios";
 import type { AxiosInstance } from "axios";
 
-const API_BASE_URL = process.env
-  .NEXT_PUBLIC_API_URL as string;
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL as string;
 
- 
 export const gameAxios = Axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
-  }
+    "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true",
+  },
 });
-
 
 export const tokenlessAxios = Axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    'Content-Type': 'application/json',
-  }
+    "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "true",
+  },
 });
 
 tokenlessAxios.interceptors.request.use((config) => {
@@ -29,11 +28,10 @@ tokenlessAxios.interceptors.request.use((config) => {
 
 export const setAxiosDefaultToken = (
   token: string,
-  axiosInstance: AxiosInstance
+  axiosInstance: AxiosInstance,
 ) => {
   if (token) {
     axiosInstance.defaults.headers.common.Authorization = `Bearer ${token}`;
-  
   }
 };
 

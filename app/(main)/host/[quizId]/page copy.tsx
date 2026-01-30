@@ -12,14 +12,20 @@ import {
   useStopQuizBroadcast,
   useRealtimeStageDetails,
   useHostRealtimeToken,
-} from "../misc/api/quizHostApi";
-import { getQuestionResultsTally } from "../misc/api/quizHostApi";
+} from "../../sessions/[id]/anchor/misc/api/quizHostApi";
+import { getQuestionResultsTally } from "../../sessions/[id]/anchor/misc/api/quizHostApi";
 
 import { useIVSRealtimeStage } from "@/hooks/useIVSRealtimeStage";
-import { useMQTT } from "@/hooks/useMqttService";
-import { StatusBadge } from "../components/StatusBadge";
-import { ActionSection, ActionConfig } from "../components/ActionSection";
-import { DataGrid, DataPoint } from "../components/DataGrid";
+import { useAbly } from "@/hooks/useMqttService";
+import { StatusBadge } from "../../sessions/[id]/anchor/misc/components/StatusBadge";
+import {
+  ActionSection,
+  ActionConfig,
+} from "../../sessions/[id]/anchor/misc/components/ActionSection";
+import {
+  DataGrid,
+  DataPoint,
+} from "../../sessions/[id]/anchor/misc/components/DataGrid";
 
 const cardBase = "rounded-3xl border border-white/10 bg-white/[0.04] p-5";
 
@@ -38,7 +44,7 @@ export default function QuizDetailPage() {
   const [loading, setLoading] = useState(false);
   const [log, setLog] = useState<string[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const { isConnected, sendMessage } = useMQTT();
+  const { isConnected, sendMessage } = useAbly();
 
   // API hooks
   const startQuiz = useStartQuizGame();
@@ -97,9 +103,7 @@ export default function QuizDetailPage() {
 
     setLoading(true);
     try {
-      const tokenPayload = await hostToken.mutateAsync(
-        quizId
-      );
+      const tokenPayload = await hostToken.mutateAsync(quizId);
       const token = tokenPayload?.data?.participant_token?.token;
 
       if (!token) {
@@ -288,7 +292,9 @@ export default function QuizDetailPage() {
     return [
       {
         label: "Game Code",
-        value: quizData.data.game_code ? String(quizData.data.game_code) : undefined,
+        value: quizData.data.game_code
+          ? String(quizData.data.game_code)
+          : undefined,
       },
       {
         label: "Status",
@@ -296,7 +302,9 @@ export default function QuizDetailPage() {
       },
       {
         label: "Anchor",
-        value: quizData.data.anchor_name ? String(quizData.data.anchor_name) : undefined,
+        value: quizData.data.anchor_name
+          ? String(quizData.data.anchor_name)
+          : undefined,
       },
       {
         label: "Stage",
@@ -310,7 +318,9 @@ export default function QuizDetailPage() {
   if (loadingQuiz) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#0b001c]">
-        <span className="animate-pulse text-sm text-white/60">Loading quiz…</span>
+        <span className="animate-pulse text-sm text-white/60">
+          Loading quiz…
+        </span>
       </div>
     );
   }
@@ -333,15 +343,15 @@ export default function QuizDetailPage() {
                   Hosting quiz #{quizId}
                 </h1>
                 <p className="mt-2 max-w-xl text-sm text-white/60">
-                  Everything the host needs in one place. Follow the control flow on the
-                  right, watch your stage preview, and keep an eye on activity as the
-                  show unfolds.
+                  Everything the host needs in one place. Follow the control
+                  flow on the right, watch your stage preview, and keep an eye
+                  on activity as the show unfolds.
                 </p>
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <StatusBadge
-                label="MQTT"
+                label="Ably"
                 value={isConnected ? "Online" : "Offline"}
                 tone={isConnected ? "success" : "danger"}
               />
@@ -351,11 +361,7 @@ export default function QuizDetailPage() {
                 tone={isJoined ? "success" : "warning"}
               />
               {timerRunning && (
-                <StatusBadge
-                  label="Timer"
-                  value={`${timer}s`}
-                  tone="accent" 
-                />
+                <StatusBadge label="Timer" value={`${timer}s`} tone="accent" />
               )}
             </div>
           </div>
@@ -378,14 +384,17 @@ export default function QuizDetailPage() {
 
         <div className="grid gap-8 xl:grid-cols-[2fr_1fr]">
           <div className="flex flex-col gap-8">
-            <section className={`${cardBase} shadow-[0_30px_60px_-40px_rgba(0,0,0,0.85)]`}>
+            <section
+              className={`${cardBase} shadow-[0_30px_60px_-40px_rgba(0,0,0,0.85)]`}
+            >
               <div className="mb-4 flex items-center justify-between">
                 <div>
                   <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/50">
                     Stage preview
                   </h2>
                   <p className="mt-1 text-xs text-white/40">
-                    Confirm your camera and audio before pushing live to contestants.
+                    Confirm your camera and audio before pushing live to
+                    contestants.
                   </p>
                 </div>
                 <StatusBadge
@@ -498,26 +507,28 @@ export default function QuizDetailPage() {
                     </p>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
-                    {["option_a", "option_b", "option_c", "option_d"].map((key, idx) => {
-                      const optionKey = key as keyof typeof question;
-                      const label = String.fromCharCode(65 + idx);
-                      const isCorrect = correctOption === label;
-                      return (
-                        <div
-                          key={optionKey as string | number}
-                          className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${
-                            isCorrect
-                              ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-100"
-                              : "border-white/10 bg-white/[0.03] text-white/80"
-                          }`}
-                        >
-                          <span className="mr-2 text-xs font-semibold tracking-[0.3em] text-white/50">
-                            {label}.
-                          </span>
-                          {question[optionKey]}
-                        </div>
-                      );
-                    })}
+                    {["option_a", "option_b", "option_c", "option_d"].map(
+                      (key, idx) => {
+                        const optionKey = key as keyof typeof question;
+                        const label = String.fromCharCode(65 + idx);
+                        const isCorrect = correctOption === label;
+                        return (
+                          <div
+                            key={optionKey as string | number}
+                            className={`rounded-2xl border px-4 py-3 text-sm font-medium transition ${
+                              isCorrect
+                                ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-100"
+                                : "border-white/10 bg-white/[0.03] text-white/80"
+                            }`}
+                          >
+                            <span className="mr-2 text-xs font-semibold tracking-[0.3em] text-white/50">
+                              {label}.
+                            </span>
+                            {question[optionKey]}
+                          </div>
+                        );
+                      },
+                    )}
                   </div>
                   {correctOption && (
                     <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-xs font-semibold text-emerald-200">
@@ -582,7 +593,9 @@ export default function QuizDetailPage() {
                 <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-white/10">
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 transition-all"
-                    style={{ width: `${Math.max(0, Math.min(timer, 10)) * 10}%` }}
+                    style={{
+                      width: `${Math.max(0, Math.min(timer, 10)) * 10}%`,
+                    }}
                   ></div>
                 </div>
               </div>
@@ -617,7 +630,8 @@ export default function QuizDetailPage() {
                 },
                 {
                   label: "Stop stream",
-                  description: "Disconnect from the stage and end the broadcast feed.",
+                  description:
+                    "Disconnect from the stage and end the broadcast feed.",
                   onClick: handleStopStream,
                   disabled: loading || !isJoined,
                   tone: "danger",
@@ -631,7 +645,8 @@ export default function QuizDetailPage() {
               actions={[
                 {
                   label: "Start quiz",
-                  description: "Send the warm-up signal and open the session to players.",
+                  description:
+                    "Send the warm-up signal and open the session to players.",
                   onClick: handleStartQuiz,
                   disabled: loading,
                 },
@@ -661,10 +676,11 @@ export default function QuizDetailPage() {
                   disabled: loading || !question,
                   tone: "neutral",
                 },
-           
+
                 {
                   label: "End quiz",
-                  description: "Wrap up the session and share final standings with everyone.",
+                  description:
+                    "Wrap up the session and share final standings with everyone.",
                   onClick: handleEndQuiz,
                   disabled: loading,
                   tone: "danger",
@@ -678,9 +694,17 @@ export default function QuizDetailPage() {
                   Quick tips
                 </h2>
                 <ul className="mt-4 space-y-3 text-xs text-white/50">
-                  <li>Run through “Send next question” → “Start timer” → “Send tally now”.</li>
-                  <li>Use “Next question placeholder” if you want to preview the next prompt privately.</li>
-                  <li>Keep the activity log open to confirm MQTT events landed.</li>
+                  <li>
+                    Run through “Send next question” → “Start timer” → “Send
+                    tally now”.
+                  </li>
+                  <li>
+                    Use “Next question placeholder” if you want to preview the
+                    next prompt privately.
+                  </li>
+                  <li>
+                    Keep the activity log open to confirm Ably events landed.
+                  </li>
                 </ul>
               </div>
             </section>

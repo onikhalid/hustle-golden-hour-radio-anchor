@@ -29,7 +29,7 @@ export default function LoginPage() {
       onSuccess: (data) => {
         tokenStorage.setToken(data.token);
         setAxiosDefaultToken(data.token, gameAxios);
-        router.push("/host");
+        router.push("/");
       },
       onError: (err) => { 
         setError(formatAxiosErrorMessage(err as AxiosError) ?? "");

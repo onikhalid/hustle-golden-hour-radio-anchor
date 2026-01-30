@@ -1,27 +1,27 @@
-import { MQTTContext, MQTTMessage } from "@/contexts/MQTTProvider";
+import { AblyContext, AblyMessage } from "@/contexts/AblyProvider";
 import { useParams } from "next/navigation";
 import { useContext, useEffect, useCallback, useState, useRef } from "react";
 
 // Hook return types
-export interface MQTTHookReturn {
+export interface AblyHookReturn {
   isConnected: boolean;
   sendMessage: (message: any, topic?: string) => Promise<boolean>;
   sendToMultipleTopics: (message: any, topics: string[]) => Promise<boolean[]>;
   broadcastMessage: (message: any, topic: string) => Promise<boolean>;
   subscribeToTopic: (
     topic: string,
-    callback: (message: MQTTMessage) => void
+    callback: (message: AblyMessage) => void,
   ) => void;
   unsubscribeFromTopic: (
     topic: string,
-    callback: (message: MQTTMessage) => void
+    callback: (message: AblyMessage) => void,
   ) => void;
-  addGlobalListener: (callback: (message: MQTTMessage) => void) => void;
-  removeGlobalListener: (callback: (message: MQTTMessage) => void) => void;
+  addGlobalListener: (callback: (message: AblyMessage) => void) => void;
+  removeGlobalListener: (callback: (message: AblyMessage) => void) => void;
   subscribedTopics: string[];
   // Legacy support
-  addMessageListener: (callback: (message: MQTTMessage) => void) => void;
-  removeMessageListener: (callback: (message: MQTTMessage) => void) => void;
+  addMessageListener: (callback: (message: AblyMessage) => void) => void;
+  removeMessageListener: (callback: (message: AblyMessage) => void) => void;
 }
 
 export interface MultiSendHookReturn {
@@ -33,11 +33,11 @@ export interface MultiSendHookReturn {
   isSending: boolean;
 }
 
-// ===== HOOK 1: Main MQTT Hook =====
-export function useMQTT(): MQTTHookReturn {
-  const context = useContext(MQTTContext);
+// ===== HOOK 1: Main Ably Hook =====
+export function useAbly(): AblyHookReturn {
+  const context = useContext(AblyContext);
   if (!context) {
-    throw new Error("useMQTT must be used within an MQTTProvider");
+    throw new Error("useAbly must be used within an AblyProvider");
   }
 
   const {
@@ -50,53 +50,58 @@ export function useMQTT(): MQTTHookReturn {
     removeGlobalListener,
     addMessageListener,
     removeMessageListener,
+    publishToTopic, // Destructure the helper
   } = context;
 
-  // Send message to single topic (backward compatible)
+  // Send message to single topic
   const sendMessage = useCallback(
     async (
       message: any,
-      topic: string = "test/topic/local"
+      topic: string = "test/topic/local",
     ): Promise<boolean> => {
       if (!client || !isConnected) {
-        console.warn("MQTT client not connected");
+        console.warn("Ably client not connected");
         return false;
       }
 
       try {
-        const messageString = JSON.stringify(message);
-        await new Promise<void>((resolve, reject) => {
-          client.publish(topic, messageString, (err) => {
-            if (err) reject(err);
-            else resolve();
-          });
-        });
+        await Promise.race([
+          publishToTopic(topic, message),
+          new Promise((_, reject) =>
+            setTimeout(
+              () => reject(new Error("Timeout sending message")),
+              5000,
+            ),
+          ),
+        ]);
         return true;
       } catch (error) {
         console.error("Failed to send message:", error);
         return false;
       }
     },
-    [client, isConnected]
+    [client, isConnected, publishToTopic],
   );
 
   // Send message to multiple topics simultaneously
   const sendToMultipleTopics = useCallback(
     async (message: any, topics: string[]): Promise<boolean[]> => {
       if (!client || !isConnected) {
-        console.warn("MQTT client not connected");
+        console.warn("Ably client not connected");
         return new Array(topics.length).fill(false);
       }
 
       const sendPromises = topics.map(async (topic) => {
         try {
-          const messageString = JSON.stringify(message);
-          await new Promise<void>((resolve, reject) => {
-            client.publish(topic, messageString, (err) => {
-              if (err) reject(err);
-              else resolve();
-            });
-          });
+          await Promise.race([
+            publishToTopic(topic, message),
+            new Promise((_, reject) =>
+              setTimeout(
+                () => reject(new Error(`Timeout sending message to ${topic}`)),
+                5000,
+              ),
+            ),
+          ]);
           return true;
         } catch (error) {
           console.error(`Failed to send message to topic ${topic}:`, error);
@@ -106,7 +111,7 @@ export function useMQTT(): MQTTHookReturn {
 
       return Promise.all(sendPromises);
     },
-    [client, isConnected]
+    [client, isConnected, publishToTopic],
   );
 
   // Broadcast message with metadata
@@ -121,7 +126,7 @@ export function useMQTT(): MQTTHookReturn {
 
       return sendMessage(broadcastPayload, topic);
     },
-    [sendMessage]
+    [sendMessage],
   );
 
   return {
@@ -141,14 +146,16 @@ export function useMQTT(): MQTTHookReturn {
 }
 
 // ===== HOOK 2: Topic-Specific Hook =====
-export function useMQTTTopic(
+export function useAblyTopic(
   topic: string,
-  callback: (message: MQTTMessage) => void,
-  dependencies: any[] = []
+  callback: (message: AblyMessage) => void,
+  dependencies: any[] = [],
 ): void {
-  const { subscribeToTopic, unsubscribeFromTopic } = useMQTT();
+  const { subscribeToTopic, unsubscribeFromTopic } = useAbly();
 
   useEffect(() => {
+    if (!topic) return; // Guard against empty topics
+
     subscribeToTopic(topic, callback);
 
     return () => {
@@ -158,8 +165,8 @@ export function useMQTTTopic(
 }
 
 // ===== HOOK 3: Multi-Send Hook =====
-export function useMQTTMultiSend(): MultiSendHookReturn {
-  const { isConnected, sendToMultipleTopics, broadcastMessage } = useMQTT();
+export function useAblyMultiSend(): MultiSendHookReturn {
+  const { isConnected, sendToMultipleTopics, broadcastMessage } = useAbly();
   const [messageQueue, setMessageQueue] = useState<
     Array<{ id: string; message: any; topics: string[] }>
   >([]);
@@ -175,7 +182,7 @@ export function useMQTTMultiSend(): MultiSendHookReturn {
       setMessageQueue((prev) => [...prev, queueItem]);
       return id;
     },
-    []
+    [],
   );
 
   // Process queued messages when connection is established
@@ -220,11 +227,11 @@ export function useMQTTMultiSend(): MultiSendHookReturn {
 // ///////////////////////////////////////////////////
 
 // Hook for managing connection status with callbacks
-export function useMQTTConnectionStatus(
+export function useAblyConnectionStatus(
   onConnect?: () => void,
-  onDisconnect?: () => void
+  onDisconnect?: () => void,
 ): boolean {
-  const { isConnected } = useMQTT();
+  const { isConnected } = useAbly();
   const prevConnected = useRef(isConnected);
 
   useEffect(() => {
@@ -240,15 +247,15 @@ export function useMQTTConnectionStatus(
 }
 
 // Hook for topic pattern matching
-export function useMQTTTopicPattern(
+export function useAblyTopicPattern(
   pattern: RegExp,
-  callback: (message: MQTTMessage) => void,
-  dependencies: any[] = []
+  callback: (message: AblyMessage) => void,
+  dependencies: any[] = [],
 ): void {
-  const { addGlobalListener, removeGlobalListener } = useMQTT();
+  const { addGlobalListener, removeGlobalListener } = useAbly();
 
   useEffect(() => {
-    const patternCallback = (message: MQTTMessage) => {
+    const patternCallback = (message: AblyMessage) => {
       if (pattern.test(message.topic)) {
         callback(message);
       }
@@ -264,9 +271,9 @@ export function useMQTTTopicPattern(
 
 // Export all hooks as default
 export default {
-  useMQTT,
-  useMQTTTopic,
-  useMQTTMultiSend,
-  useMQTTConnectionStatus,
-  useMQTTTopicPattern,
+  useAbly,
+  useAblyTopic,
+  useAblyMultiSend,
+  useAblyConnectionStatus,
+  useAblyTopicPattern,
 };

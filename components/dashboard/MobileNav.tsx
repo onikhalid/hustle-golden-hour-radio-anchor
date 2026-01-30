@@ -3,7 +3,16 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Trophy, UserPlus, List, Link2, Edit, Menu, X } from "lucide-react";
+import {
+  LayoutDashboard,
+  Trophy,
+  UserPlus,
+  List,
+  Link2,
+  Edit,
+  Menu,
+  X,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -13,28 +22,18 @@ const navItems = [
     icon: LayoutDashboard,
   },
   {
-    name: "Winners",
-    href: "/weekly-winners",
-    icon: Trophy,
-  },
-  {
-    name: "Agents",
-    href: "/agent-records",
-    icon: UserPlus,
-  },
-  {
     name: "Categories",
     href: "/categories",
     icon: List,
   },
   {
-    name: "Assign",
-    href: "/assign-question",
+    name: "Questions",
+    href: "/questions",
     icon: Link2,
   },
   {
-    name: "Update",
-    href: "/update-question",
+    name: "Sessions",
+    href: "/sessions",
     icon: Edit,
   },
 ];
@@ -65,7 +64,11 @@ export default function MobileNav() {
             onClick={() => setIsMenuOpen(!isMenuOpen)}
             className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/5 text-white transition hover:bg-white/10"
           >
-            {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            {isMenuOpen ? (
+              <X className="h-5 w-5" />
+            ) : (
+              <Menu className="h-5 w-5" />
+            )}
           </button>
         </div>
       </header>
@@ -83,7 +86,7 @@ export default function MobileNav() {
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = mounted && pathname === item.href;
-              
+
               return (
                 <Link
                   key={item.href}
@@ -93,13 +96,15 @@ export default function MobileNav() {
                     "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all",
                     isActive
                       ? "bg-gradient-to-r from-purple-500/20 to-pink-500/20 text-white border border-purple-500/30"
-                      : "text-white/60 hover:text-white hover:bg-white/5"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
                   )}
                 >
-                  <Icon className={cn(
-                    "h-5 w-5",
-                    isActive ? "text-purple-400" : "text-white/60"
-                  )} />
+                  <Icon
+                    className={cn(
+                      "h-5 w-5",
+                      isActive ? "text-purple-400" : "text-white/60",
+                    )}
+                  />
                   <span>{item.name}</span>
                 </Link>
               );
@@ -114,22 +119,22 @@ export default function MobileNav() {
           {navItems.slice(0, 4).map((item) => {
             const Icon = item.icon;
             const isActive = mounted && pathname === item.href;
-            
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 className={cn(
                   "flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all min-w-[70px] relative",
-                  isActive
-                    ? "text-white"
-                    : "text-white/60 hover:text-white"
+                  isActive ? "text-white" : "text-white/60 hover:text-white",
                 )}
               >
-                <Icon className={cn(
-                  "h-6 w-6",
-                  isActive ? "text-purple-400" : "text-white/60"
-                )} />
+                <Icon
+                  className={cn(
+                    "h-6 w-6",
+                    isActive ? "text-purple-400" : "text-white/60",
+                  )}
+                />
                 <span className="text-xs font-medium">{item.name}</span>
                 {isActive && (
                   <div className="absolute bottom-0 left-1/2 -translate-x-1/2 h-1 w-12 rounded-full bg-gradient-to-r from-purple-500 to-pink-500" />

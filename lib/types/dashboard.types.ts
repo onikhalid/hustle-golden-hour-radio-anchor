@@ -51,6 +51,10 @@ export type AssignQuestionData = z.infer<typeof assignQuestionSchema>;
 
 export const updateQuestionSchema = z.object({
   question_id: z.number().min(1, "Question ID is required"),
+  option_a: z.string().min(1, "Option A is required"),
+  option_b: z.string().min(1, "Option B is required"),
+  option_c: z.string().min(1, "Option C is required"),
+  option_d: z.string().min(1, "Option D is required"),
   question: z.string().min(1, "Question text is required"),
   correct_option: z.enum(["A", "B", "C", "D"], {
     errorMap: () => ({ message: "Correct option must be A, B, C, or D" }),
@@ -59,6 +63,36 @@ export const updateQuestionSchema = z.object({
 });
 
 export type UpdateQuestionData = z.infer<typeof updateQuestionSchema>;
+
+// Question Types
+export interface Question {
+  id: number;
+  question: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
+  correct_option: string;
+  category: string | null;
+  sub_category: string | null;
+  used: boolean;
+  number_of_uses: number;
+  is_active: boolean;
+}
+
+export const createQuestionSchema = z.object({
+  question: z.string().min(1, "Question text is required"),
+  option_a: z.string().min(1, "Option A is required"),
+  option_b: z.string().min(1, "Option B is required"),
+  option_c: z.string().min(1, "Option C is required"),
+  option_d: z.string().min(1, "Option D is required"),
+  correct_option: z.enum(["A", "B", "C", "D"], {
+    errorMap: () => ({ message: "Correct option must be A, B, C, or D" }),
+  }),
+  category: z.string().min(1, "Category is required"),
+});
+
+export type CreateQuestionData = z.infer<typeof createQuestionSchema>;
 
 export interface CategoryData {
   id: number;
@@ -75,3 +109,25 @@ export interface ApiResponse<T = any> {
   message?: string;
   error?: string;
 }
+
+export interface SessionData {
+  id: number;
+  start_time: string;
+  end_time: string;
+  is_active: boolean;
+  is_manual: boolean;
+  question_limit: number;
+  current_question_index: number;
+  created_at: string;
+  assigned_questions?: Question[];
+}
+
+export const createSessionSchema = z.object({
+  start_time: z.string().min(1, "Start time is required"),
+  end_time: z.string().min(1, "End time is required"),
+  is_manual: z.boolean().default(true),
+  question_limit: z.number().min(1, "Question limit must be at least 1"),
+  is_question_generated: z.boolean().default(true),
+});
+
+export type CreateSessionData = z.infer<typeof createSessionSchema>;

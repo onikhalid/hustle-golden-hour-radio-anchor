@@ -4,6 +4,7 @@ import "./globals.css";
 import { AllProviders } from "@/contexts";
 import { Suspense } from "react";
 import { cn } from "@/lib/utils";
+import { Toaster } from "@/components/ui/toaster";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,18 +33,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <AllProviders>
-        <body
-          className={cn(
-            geistSans.variable,
-            geistMono.variable,
-            manrope.className,
-            "antialiased"
-          )}
-        >
+      <body
+        className={cn(
+          geistSans.variable,
+          geistMono.variable,
+          manrope.className,
+          "antialiased",
+        )}
+      >
+        <AllProviders>
           <Suspense fallback={<div>Loading...</div>}>{children}</Suspense>
-        </body>
-      </AllProviders>
+          <Toaster />
+        </AllProviders>
+      </body>
     </html>
   );
 }
