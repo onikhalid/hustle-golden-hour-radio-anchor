@@ -437,7 +437,7 @@ const AnchorSessionPage = () => {
           <div className="flex md:flex-col justify-between gap-4 md:gap-6 lg:flex-row lg:items-start lg:justify-between">
             <div className="flex md:flex-col items-center md:items-start gap-4">
               <Link
-                href={"/host"}
+                href={`/sessions/${id}`}
                 className="flex p-2 md:px-4 md:py-2 items-center justify-center w-max rounded-full border border-white/10 bg-white/10 text-xs font-semibold uppercase tracking-[0.2em] text-white/70 transition hover:bg-white/20"
               >
                 <ChevronLeft className="inline size-3 lg:size-5 md:mr-1 md:-ml-1" />

@@ -16,13 +16,19 @@ import {
 import { useGetSessionDetails } from "../misc/api";
 import { cn } from "@/lib/utils";
 import { SelectQuestionsModal } from "../misc/components/SelectQuestionsModal";
+import { useGetSessionQuestions } from "../misc/api/getSessionQuestions";
 
 export default function SessionDetailsPage() {
   const { id } = useParams();
   const router = useRouter();
   const { data: result, isLoading, error } = useGetSessionDetails(id as string);
   const session = result?.data;
-
+  const {
+    data: questions,
+    isLoading: questionsLoading,
+    error: questionsError,
+  } = useGetSessionQuestions(id as string);
+  console.log(questions);
   const [isSelectModalOpen, setSelectModalOpen] = useState(false);
 
   if (isLoading) {
@@ -224,20 +230,35 @@ export default function SessionDetailsPage() {
         </header>
 
         <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-8 backdrop-blur-xl">
-          {/* {session.assigned_questions && session.assigned_questions.length > 0 ? (
-            <ul className="space-y-4">
-              {session.assigned_questions.map((question: any, index: number) => (
-                <li key={question.id} className="flex items-center gap-3">
-                  <span className="text-white/60">{index + 1}.</span>
-                  <p className="text-white">{question.text}</p>
-                </li>
+          {questions && questions.data.length > 0 ? (
+            <div className="grid gap-4">
+              {questions.data.map((sq) => (
+                <div
+                  key={sq.id}
+                  className="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors"
+                >
+                  <div className="flex items-center gap-4">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/5 text-sm font-medium text-white/60">
+                      {sq.order_index}
+                    </span>
+                    <p className="text-sm font-medium text-white/90">
+                      {sq.question.question}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-white/60">
+                      {sq.question.category}
+                    </span>
+                    {/* <span className="text-xs font-medium text-white/60">{sq.question.used}</span> */}
+                  </div>
+                </div>
               ))}
-            </ul>
+            </div>
           ) : (
             <p className="text-white/40 text-center">
               No specific questions detailed in session metadata yet.
             </p>
-          )} */}
+          )}
         </div>
       </section>
 
