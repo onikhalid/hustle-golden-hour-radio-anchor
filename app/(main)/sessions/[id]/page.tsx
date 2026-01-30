@@ -266,7 +266,7 @@ export default function SessionDetailsPage() {
         isOpen={isSelectModalOpen}
         onClose={() => setSelectModalOpen(false)}
         sessionId={session.id}
-        questionLimit={session.question_limit}
+        questionLimit={questions?.data.length ?? 0}
         assignedCount={session.current_question_index}
       />
     </div>
