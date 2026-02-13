@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, Lock, FileText } from "lucide-react";
+import { ChevronLeft, Lock, FileText, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 import { useRequestNextQuestion } from "./misc/api";
@@ -17,7 +17,7 @@ import {
 import { getQuestionResultsTally } from "./misc/api/quizHostApi";
 import type { QuestionTallyResponse } from "./misc/api/quizHostApi";
 
-import { useAbly, useAblyTopic } from "@/hooks/useMqttService";
+import { useAbly, useAblyTopic, useAblyPresence } from "@/hooks/useMqttService";
 import { StatusBadge } from "./misc/components/StatusBadge";
 import { DataGrid, DataPoint } from "./misc/components/DataGrid";
 import { TallyModal } from "./misc/components/TallyModal";
@@ -27,6 +27,7 @@ import { useEndQuiz } from "./misc/api";
 import { useQueryClient } from "@tanstack/react-query";
 import { QuizQuestion } from "./misc/api/postRequestNextQuestion";
 import { useGetSessionDetails } from "../../misc/api";
+import { useGetComments } from "../../misc/api/getComments";
 
 const cardBase =
   "rounded-3xl border border-white/10 bg-white/[0.04] px-4 py-3.5 md:p-5";
@@ -40,7 +41,7 @@ type ControlButton = {
 };
 
 const controlButtonBase =
-  "flex flex-col justify-center rounded-lg md:rounded-2xl cursor-pointer px-2 py-1.5 md:px-4 md:py-3 text-left text-sm font-semibold transition duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-50";
+  "flex flex-col justify-center rounded-lg md:rounded-2xl cursor-pointer px-2 py-1.5 md:px-4 md:py-3 text-left text-sm font-semibold transition duration-150 ease-out focus:outline-none focus-visible:ring-2 focus-visible:ring-white/60 disabled:cursor-not-allowed disabled:opacity-50 h-full relative overflow-hidden";
 
 const controlVariants: Record<NonNullable<ControlButton["variant"]>, string> = {
   primary:
@@ -114,6 +115,25 @@ const AnchorSessionPage = () => {
   const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
   const [isLockAnswerOpen, setIsLockAnswerOpen] = useState(false);
 
+  // Comments state
+  const { data: commentsData, isLoading: loadingComments } = useGetComments();
+  const [comments, setComments] = useState<
+    {
+      id: number;
+      phone_number: string;
+      comment: string;
+      is_published: boolean;
+      created_at: string;
+    }[]
+  >([]);
+
+  // Sync initial comments
+  useEffect(() => {
+    if (commentsData?.results?.data) {
+      setComments(commentsData.results.data);
+    }
+  }, [commentsData]);
+
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const processingEndRef = useRef(false); // Ref to prevent double execution of handleEndTimer
   const handleEndTimerRef = useRef<(() => Promise<void>) | null>(null); // Prevent stale closures
@@ -123,6 +143,59 @@ const AnchorSessionPage = () => {
 
   // Only subscribe to the topic if we are connected (have a valid token)
   const topic = isConnected ? `publish/question/session/${id}` : "";
+  const commentTopic = isConnected ? `publish/comment/${id}` : "";
+  const answerTopic = isConnected ? `answer/question/session/${id}` : "";
+  const presenceTopic = isConnected ? `publish/question/session/${id}` : "";
+
+  // Presence
+  const presentMembers = useAblyPresence(presenceTopic);
+
+  useEffect(() => {
+    console.log("⚓ AnchorPage: Presence topic:", presenceTopic);
+    console.log("⚓ AnchorPage: Present members updated:", presentMembers);
+  }, [presenceTopic, presentMembers]);
+
+  // Answers State
+  const [answers, setAnswers] = useState<
+    {
+      id: number;
+      phone_number: string;
+      selected_option: string;
+      timestamp: number;
+    }[]
+  >([]);
+
+  useAblyTopic(
+    answerTopic,
+    (message) => {
+      if (
+        message.event === "Answer Question" ||
+        message.name === "Answer Question"
+      ) {
+        let payload = message.payload || message.data;
+        // Check if payload is a string and parse it (based on user's example)
+        if (typeof payload === "string") {
+          try {
+            payload = JSON.parse(payload);
+          } catch (e) {
+            console.error("Failed to parse answer payload", e);
+            return;
+          }
+        }
+
+        const newAnswer = {
+          id: Date.now(),
+          phone_number: payload.phone_number,
+          selected_option: payload.selected_option,
+          timestamp: Date.now(),
+        };
+
+        setAnswers((prev) => [newAnswer, ...prev]);
+        addLog(`Answer received: ${payload.phone_number}`);
+      }
+    },
+    [answerTopic],
+  );
 
   useAblyTopic(
     topic,
@@ -130,6 +203,32 @@ const AnchorSessionPage = () => {
       console.log("Receiving session message:", message);
     },
     [topic],
+  );
+
+  useAblyTopic(
+    commentTopic,
+    (message) => {
+      // Check for event type in message.event (or message.name as fallback if needed, but user log shows event)
+      if (
+        message.event === "publish-comment" ||
+        message.name === "publish-comment"
+      ) {
+        const payload = message.payload || message.data;
+
+        // Payload format: { session_id, phone_number, comment, comment_id }
+        const newComment = {
+          id: payload.comment_id || Date.now(),
+          phone_number: payload.phone_number,
+          comment: payload.comment,
+          is_published: true,
+          created_at: new Date().toISOString(),
+        };
+
+        setComments((prev) => [newComment, ...prev]);
+        addLog(`New comment: ${payload.comment?.substring(0, 20)}...`);
+      }
+    },
+    [commentTopic],
   );
 
   // API hooks
@@ -183,9 +282,14 @@ const AnchorSessionPage = () => {
     setLoading(false);
   };
 
+  const [activeAction, setActiveAction] = useState<string | null>(null);
+
+  // ... existing state ...
+
   // Request next question and send to player
   const handleSendQuestion = async () => {
     setLoading(true);
+    setActiveAction("send_question");
     setCorrectOption(null);
     setRoundTally(null);
     setIsTallyModalOpen(false);
@@ -194,7 +298,6 @@ const AnchorSessionPage = () => {
         onSuccess: async (data) => {
           if (!data) {
             addLog("Error: Could not retrieve next question data.");
-            setLoading(false);
             return;
           }
 
@@ -203,7 +306,6 @@ const AnchorSessionPage = () => {
 
           if (!q) {
             addLog(`Error: Question data is missing.`);
-            setLoading(false);
             return;
           }
 
@@ -222,13 +324,16 @@ const AnchorSessionPage = () => {
     } catch (e) {
       addLog("Failed to fetch/send next question");
       console.error(e);
+    } finally {
+      setLoading(false);
+      setActiveAction(null);
     }
-    setLoading(false);
   };
 
   // Start timer and notify players
   const handleStartTimer = async () => {
     if (!question) return;
+    setActiveAction("start_timer");
 
     if (timerRef.current) clearInterval(timerRef.current);
 
@@ -263,11 +368,13 @@ const AnchorSessionPage = () => {
         startCountdown();
         addLog("Timer started (10s)");
         processingEndRef.current = false;
+        setActiveAction(null);
       },
       onError: async () => {
         addLog("Timer start failed, sending timer event manually");
         handleEndTimer();
         processingEndRef.current = false;
+        setActiveAction(null);
       },
     });
   };
@@ -277,6 +384,7 @@ const AnchorSessionPage = () => {
     if (!question || processingEndRef.current) return;
     processingEndRef.current = true;
     setLoading(true);
+    // Note: We don't set activeAction here because this is often called automatically/internally
 
     try {
       // Race the API call against a 5-second timeout to prevent valid network hangs from locking UI
@@ -330,6 +438,7 @@ const AnchorSessionPage = () => {
   const handleManualTally = async () => {
     if (!question) return;
     setLoading(true);
+    setActiveAction("manual_tally");
     try {
       if (timerRunning) {
         await elapseQTime.mutateAsync(question.question_id);
@@ -346,14 +455,17 @@ const AnchorSessionPage = () => {
       setIsTallyModalOpen(true);
     } catch {
       addLog("Manual tally failed.");
+    } finally {
+      setLoading(false);
+      setActiveAction(null);
     }
-    setLoading(false);
   };
 
   // End entire quiz session
   const { mutate: endQuizMutate } = useEndQuiz();
   const handleEndQuiz = async () => {
     setLoading(true);
+    setActiveAction("end_quiz");
     try {
       await sendMessage({ event: "quiz_session_end" }, topic);
       addLog("Quiz session end signal sent.");
@@ -362,13 +474,18 @@ const AnchorSessionPage = () => {
       setRoundTally(null);
     } catch {
       addLog("Failed to send session end.");
+    } finally {
+      setLoading(false);
+      setActiveAction(null);
     }
-    setLoading(false);
   };
 
   const controlButtons: ControlButton[] = [
     {
-      label: "Send next question",
+      label:
+        activeAction === "send_question"
+          ? "Sending question..."
+          : "Send next question",
       onClick: handleSendQuestion,
       disabled: loading || timerRunning,
       variant: "primary",
@@ -377,21 +494,23 @@ const AnchorSessionPage = () => {
         : "Push the next prompt",
     },
     {
-      label: "Start timer",
+      label:
+        activeAction === "start_timer" ? "Starting timer..." : "Start timer",
       onClick: handleStartTimer,
       disabled: loading || !question || timerRunning,
       variant: "accent",
       description: question ? "Countdown for answers" : "Load a question first",
     },
     {
-      label: "Send tally now",
+      label:
+        activeAction === "manual_tally" ? "Sending tally..." : "Send tally now",
       onClick: handleManualTally,
       disabled: loading || !question,
       variant: "neutral",
       description: "Refresh the leaderboard",
     },
     {
-      label: "End quiz",
+      label: activeAction === "end_quiz" ? "Ending quiz..." : "End quiz",
       onClick: handleEndQuiz,
       disabled: loading,
       variant: "danger",
@@ -455,6 +574,11 @@ const AnchorSessionPage = () => {
                 label="Ably"
                 value={isConnected ? "Online" : "Offline"}
                 tone={isConnected ? "success" : "danger"}
+              />
+              <StatusBadge
+                label="Players"
+                value={presentMembers.length.toString()}
+                tone="default"
               />
               {timerRunning && (
                 <StatusBadge label="Timer" value={`${timer}s`} tone="accent" />
@@ -522,30 +646,76 @@ const AnchorSessionPage = () => {
               <div className="grid gap-2 grid-cols-2 lg:grid-cols-3">
                 {controlButtons.map(renderControlButton)}
               </div>
+
+              {/* Timer Moved Here */}
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                <p className="text-[10px] uppercase tracking-[0.3em] text-white/40">
+                  Timer
+                </p>
+                <div className="mt-2 flex items-end justify-between">
+                  <span className="text-3xl font-semibold text-white/90">
+                    {timerRunning ? timer : "00"}
+                  </span>
+                  <span className="text-[11px] text-white/40">seconds</span>
+                </div>
+                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                  <div
+                    className="h-full transition-[width] ease-linear rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 "
+                    style={{
+                      width: `${Math.max(0, Math.min(timer, 10)) * 10}%`,
+                    }}
+                  ></div>
+                </div>
+              </div>
+
+              {/* Live Answers Section ADDED */}
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 flex flex-col gap-4 h-[300px]">
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] uppercase tracking-[0.3em] text-white/40">
+                    Live Answers
+                  </p>
+                  <div className="bg-white/10 text-white/60 text-[10px] px-2 py-0.5 rounded-full">
+                    {answers.length}
+                  </div>
+                </div>
+
+                {answers.length === 0 ? (
+                  <div className="flex flex-1 items-center justify-center text-center p-4">
+                    <p className="text-sm text-white/40">
+                      Waiting for answers...
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                    {answers.map((answer) => (
+                      <div
+                        key={answer.id}
+                        className="rounded-xl bg-white/[0.03] p-3 border border-white/5 flex justify-between items-center"
+                      >
+                        <span className="text-xs text-white/80 font-mono">
+                          {answer.phone_number}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-indigo-400">
+                            Option {answer.selected_option}
+                          </span>
+                          <span className="text-[10px] text-white/30">
+                            {new Date(answer.timestamp).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                              second: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </section>
           </div>
 
           <aside className="space-y-4 md:space-y-6">
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-              <p className="text-[10px] uppercase tracking-[0.3em] text-white/40">
-                Timer
-              </p>
-              <div className="mt-2 flex items-end justify-between">
-                <span className="text-3xl font-semibold text-white/90">
-                  {timerRunning ? timer : "00"}
-                </span>
-                <span className="text-[11px] text-white/40">seconds</span>
-              </div>
-              <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full transition-[width] ease-linear rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 "
-                  style={{
-                    width: `${Math.max(0, Math.min(timer, 10)) * 10}%`,
-                  }}
-                ></div>
-              </div>
-            </div>
-
             {quizData?.data?.is_manual && (
               <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
                 <p className="text-[10px] uppercase tracking-[0.3em] text-white/40 mb-3">
@@ -582,15 +752,56 @@ const AnchorSessionPage = () => {
               </div>
             </button>
 
-            <div className={`${cardBase} space-y-4`}>
-              <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-white/50">
-                Session Info
-              </h2>
-              <ul className="space-y-2 text-xs text-white/60">
-                <li>• No video streaming in this session.</li>
-                <li>• Use Ably for all real-time events.</li>
-                <li>• Ensure session is started before sending questions.</li>
-              </ul>
+            {/* Session Info REMOVED */}
+
+            {/* Comments Section ADDED */}
+            <div
+              className={`${cardBase} flex flex-col gap-4 h-[400px] md:h-[500px]`}
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-white/50">
+                  Comments
+                </h2>
+                <div className="bg-white/10 text-white/60 text-[10px] px-2 py-0.5 rounded-full">
+                  {comments.length}
+                </div>
+              </div>
+
+              {loadingComments ? (
+                <div className="flex flex-1 items-center justify-center">
+                  <Loader2 className="animate-spin text-white/30" />
+                </div>
+              ) : comments.length === 0 ? (
+                <div className="flex flex-1 items-center justify-center text-center p-4">
+                  <p className="text-sm text-white/40">
+                    No comments yet. Waiting for interaction...
+                  </p>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                  {comments.map((comment) => (
+                    <div
+                      key={comment.id}
+                      className="rounded-xl bg-white/[0.03] p-3 border border-white/5"
+                    >
+                      <p className="text-sm text-white/90 mb-1">
+                        {comment.comment}
+                      </p>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-white/40">
+                          {comment.phone_number}
+                        </span>
+                        <span className="text-[10px] text-white/30">
+                          {new Date(comment.created_at).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </aside>
         </div>

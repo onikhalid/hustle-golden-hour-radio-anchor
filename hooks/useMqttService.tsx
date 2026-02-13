@@ -1,5 +1,12 @@
 import { AblyContext, AblyMessage } from "@/contexts/AblyProvider";
-import { useContext, useEffect, useCallback, useState, useRef } from "react";
+import {
+  useContext,
+  useEffect,
+  useCallback,
+  useState,
+  useRef,
+  useMemo,
+} from "react";
 
 // Hook return types
 export interface AblyHookReturn {
@@ -21,6 +28,13 @@ export interface AblyHookReturn {
   // Legacy support
   addMessageListener: (callback: (message: AblyMessage) => void) => void;
   removeMessageListener: (callback: (message: AblyMessage) => void) => void;
+  // Presence
+  getPresence: (topic: string) => Promise<any[]>;
+  subscribePresence: (topic: string, callback: (message: any) => void) => void;
+  unsubscribePresence: (
+    topic: string,
+    callback: (message: any) => void,
+  ) => void;
 }
 
 export interface MultiSendHookReturn {
@@ -50,6 +64,9 @@ export function useAbly(): AblyHookReturn {
     addMessageListener,
     removeMessageListener,
     publishToTopic, // Destructure the helper
+    getPresence,
+    subscribePresence,
+    unsubscribePresence,
   } = context;
 
   // Send message to single topic
@@ -138,6 +155,9 @@ export function useAbly(): AblyHookReturn {
     addGlobalListener,
     removeGlobalListener,
     subscribedTopics,
+    getPresence,
+    subscribePresence,
+    unsubscribePresence,
     // Legacy support
     addMessageListener,
     removeMessageListener,
@@ -219,6 +239,77 @@ export function useAblyMultiSend(): MultiSendHookReturn {
   };
 }
 
+// ===== HOOK 4: Presence Hook =====
+export function useAblyPresence(topic: string) {
+  const { isConnected, getPresence, subscribePresence, unsubscribePresence } =
+    useAbly();
+  const [presenceMap, setPresenceMap] = useState<Map<string, any>>(new Map());
+
+  useEffect(() => {
+    if (!topic || !isConnected) return;
+
+    console.log(`🕵️ AblyPresence: Hook mounted for topic "${topic}"`);
+
+    // Initial fetch to populate existing members
+    const fetchInitial = async () => {
+      try {
+        const members = await getPresence(topic);
+        console.log(
+          `🕵️ AblyPresence: Initial fetch returned ${members.length} members`,
+        );
+
+        setPresenceMap((prev) => {
+          const newMap = new Map(prev);
+          members.forEach((m: any) => {
+            // Use clientId as key, or connectionId if clientId is missing
+            const key = m.clientId || m.connectionId;
+            if (key) newMap.set(key, m);
+          });
+          return newMap;
+        });
+      } catch (error) {
+        console.error("Failed to get initial presence:", error);
+      }
+    };
+
+    fetchInitial();
+
+    const onPresenceUpdate = (msg: any) => {
+      console.log(`🕵️ AblyPresence: Event "${msg.action}" on "${topic}"`);
+
+      setPresenceMap((prev) => {
+        const newMap = new Map(prev);
+        const key = msg.clientId || msg.connectionId;
+
+        if (!key) {
+          return prev;
+        }
+
+        if (
+          msg.action === "enter" ||
+          msg.action === "present" ||
+          msg.action === "update"
+        ) {
+          newMap.set(key, msg);
+        } else if (msg.action === "leave") {
+          newMap.delete(key);
+        }
+
+        return newMap;
+      });
+    };
+
+    subscribePresence(topic, onPresenceUpdate);
+
+    return () => {
+      unsubscribePresence(topic, onPresenceUpdate);
+    };
+  }, [topic, isConnected, getPresence, subscribePresence, unsubscribePresence]);
+
+  // Convert Map values to array for the return value
+  return useMemo(() => Array.from(presenceMap.values()), [presenceMap]);
+}
+
 // ///////////////////////////////////////////////////
 // ///////////////////////////////////////////////////
 // =====            UTILITY HOOKS             ===== //
@@ -273,6 +364,7 @@ export default {
   useAbly,
   useAblyTopic,
   useAblyMultiSend,
+  useAblyPresence,
   useAblyConnectionStatus,
   useAblyTopicPattern,
 };

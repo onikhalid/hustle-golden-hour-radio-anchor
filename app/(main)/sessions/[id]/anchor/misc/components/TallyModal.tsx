@@ -10,6 +10,7 @@ type TallyModalProps = {
   tallyData?: {
     question: Question;
     results: QuestionResult[];
+    option_counts?: Record<string, number>;
   } | null;
 };
 
@@ -97,6 +98,41 @@ export const TallyModal: React.FC<TallyModalProps> = ({
                 Answered in {winner.answered_in}s
               </span>
             </div>
+          </div>
+        )}
+
+        {/* Option Counts Display */}
+        {tallyData?.option_counts && (
+          <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+            {["A", "B", "C", "D"].map((option) => {
+              const count = tallyData.option_counts?.[option] || 0;
+              const isCorrect = tallyData.question.correct_option === option;
+
+              return (
+                <div
+                  key={option}
+                  className={`
+                    relative overflow-hidden rounded-xl border p-3 flex flex-col items-center justify-center gap-1
+                    transition-all duration-300
+                    ${
+                      isCorrect
+                        ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-100"
+                        : "bg-white/5 border-white/10 text-white/70"
+                    }
+                  `}
+                >
+                  <span
+                    className={`text-[10px] uppercase font-bold tracking-widest opacity-60`}
+                  >
+                    Option {option}
+                  </span>
+                  <span className="text-2xl font-bold">{count}</span>
+                  {isCorrect && (
+                    <div className="absolute top-2 right-2 h-1.5 w-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 

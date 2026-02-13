@@ -12,8 +12,10 @@ import { useQuery } from "@tanstack/react-query";
 import { tokenlessAxios } from "@/lib/axios";
 
 export interface AblyMessage {
+  name?: string;
   topic: string;
   event?: string;
+  data?: any;
   payload: any;
   timestamp: number;
 }

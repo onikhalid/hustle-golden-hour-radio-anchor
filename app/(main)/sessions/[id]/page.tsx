@@ -17,6 +17,7 @@ import { useGetSessionDetails } from "../misc/api";
 import { cn } from "@/lib/utils";
 import { SelectQuestionsModal } from "../misc/components/SelectQuestionsModal";
 import { useGetSessionQuestions } from "../misc/api/getSessionQuestions";
+import Link from "next/link";
 
 export default function SessionDetailsPage() {
   const { id } = useParams();
@@ -69,34 +70,43 @@ export default function SessionDetailsPage() {
           <ArrowLeft className="h-4 w-4" /> Back to sessions
         </button>
 
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30">
-              <Calendar className="h-7 w-7 text-purple-400" />
-            </div>
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-3xl font-bold text-white">
-                  Session #{session.id}
-                </h1>
-                <div
-                  className={cn(
-                    "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
-                    session.is_active
-                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                      : "bg-white/5 text-white/40 border border-white/10",
-                  )}
-                >
-                  {session.is_active ? "Active" : "Inactive"}
-                </div>
+        <div className="flex flex-col md:flex-row md:items-center justify-between">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-purple-500/20 to-pink-500/20 border border-purple-500/30">
+                <Calendar className="h-7 w-7 text-purple-400" />
               </div>
-              <p className="text-white/50">
-                Created on {new Date(session.created_at).toLocaleDateString()}
-              </p>
+              <div>
+                <div className="flex items-center gap-3">
+                  <h1 className="text-3xl font-bold text-white">
+                    Session #{session.id}
+                  </h1>
+                  <div
+                    className={cn(
+                      "px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+                      session.is_active
+                        ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                        : "bg-white/5 text-white/40 border border-white/10",
+                    )}
+                  >
+                    {session.is_active ? "Active" : "Inactive"}
+                  </div>
+                </div>
+                <p className="text-white/50">
+                  Created on {new Date(session.created_at).toLocaleDateString()}
+                </p>
+              </div>
             </div>
           </div>
 
           <div className="flex items-center gap-3">
+            <Link
+              href={`/sessions/${id}/anchor`}
+              className="flex items-center gap-2 rounded-xl bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:opacity-50"
+            >
+              <Plus className={`h-4 w-4`} />
+              Anchor
+            </Link>
             <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 backdrop-blur-sm">
               <span className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">
                 Status

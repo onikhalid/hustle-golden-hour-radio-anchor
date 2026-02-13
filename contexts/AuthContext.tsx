@@ -104,9 +104,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         const token = tokenStorage.getToken();
         if (token) {
           setAxiosDefaultToken(token, gameAxios);
-          const res = await gameAxios.get("/api/accounts/user/details");
-          console.log(res.data);
-          authDispatch({ type: "LOGIN", payload: res.data?.data as User });
+          try {
+            const res = await gameAxios.get("/api/accounts/user/details");
+            console.log(res.data);
+            authDispatch({ type: "LOGIN", payload: res.data?.data as User });
+          } catch (error: any) {
+            console.error("Error fetching user details:", error);
+            if (error.response && [401, 403].includes(error.response.status)) {
+              console.log("Token invalid/expired, logging out...");
+              authDispatch({ type: "LOGOUT" });
+              router.push("/login");
+            } else {
+              // Even if it is not 401, if we can't get user details, we might be in a bad state.
+              // But strictly for this task, we focus on auth errors.
+              // Optionally fall back to unauthenticated if critical for app function?
+              // For now, let's assume network errors etc should not log them out aggressively unless status is definitive.
+              authDispatch({ type: "STOP_LOADING" });
+            }
+          }
         } else {
           authDispatch({ type: "STOP_LOADING" });
           authDispatch({ type: "LOGOUT" });
@@ -117,6 +132,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     };
     initializeAuth();
+
+    const interceptor = gameAxios.interceptors.response.use(
+      (response) => response,
+      (error) => {
+        if (error.response && error.response.status === 401) {
+          console.log("Global 401 interceptor triggered");
+          authDispatch({ type: "LOGOUT" });
+          router.push("/login");
+        }
+        return Promise.reject(error);
+      },
+    );
+
+    return () => {
+      gameAxios.interceptors.response.eject(interceptor);
+    };
   }, []);
 
   return (
