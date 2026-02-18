@@ -7,7 +7,7 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen bg-[url('/images/bg/hustle-bg.png')] ">
+    <div className="min-h-screen bg-[url('/images/bg/hustle-bg.png')]  ">
       {/* Sidebar for Desktop */}
       <Sidebar />
 
@@ -15,8 +15,8 @@ export default function MainLayout({
       <MobileNav />
 
       {/* Main Content */}
-      <main className="md:pl-64 pt-[73px] md:pt-0 pb-24 md:pb-8">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="md:pl-64 pt-[73px] md:pt-0 pb-24 md:pb-8 !bg-black/40">
+        <div className="mx-auto max-w-8xl px-4 py-8 sm:px-6 lg:px-8">
           {children}
         </div>
       </main>

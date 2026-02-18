@@ -22,7 +22,7 @@ interface NextQuestionResponse {
 
 const requestNextQuestion = async (id: string | number) => {
   const res = await gameAxios.post(
-    `/api/v1/golden_hour_quiz/sessions/next-question/${id}?X-Company-Code=RTM&X-Secret-Key=S92PS48OE3`,
+    `/api/v1/golden_hour_quiz/sessions/next-question/${id}?X-Company-Code=RFM&X-Secret-Key=3AD9R0RP44`,
   );
   return res.data as NextQuestionResponse;
 };

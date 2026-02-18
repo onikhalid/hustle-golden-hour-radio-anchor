@@ -19,7 +19,7 @@ interface PostCommentResponse {
 }
 const GetComments = async () => {
   const response = await tokenlessAxios.get<PostCommentResponse>(
-    `/api/v1/golden_hour_quiz/comments/list?X-Company-Code=RTM&X-Secret-Key=S92PS48OE3`,
+    `/api/v1/golden_hour_quiz/comments/list?X-Company-Code=RFM&X-Secret-Key=3AD9R0RP44`,
   );
   return response.data;
 };

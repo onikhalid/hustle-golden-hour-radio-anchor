@@ -22,7 +22,7 @@ export const useCreateLiveQuiz = () => {
 
 const startAnchorSession = async (id: string | number) => {
   const res = await gameAxios.post(
-    `/api/v1/golden_hour_quiz/sessions/start/?X-Company-Code=RTM&X-Secret-Key=S92PS48OE3`,
+    `/api/v1/golden_hour_quiz/sessions/start/?X-Company-Code=RFM&X-Secret-Key=3AD9R0RP44`,
   );
   return res.data;
 };
@@ -45,7 +45,7 @@ export const useStartQuizGame = () => {
 
 const startQuestionTime = async (id: string | number) => {
   const res = await gameAxios.put(
-    `/api/v1/golden_hour_quiz/questions/start-time/${id}?X-Company-Code=RTM&X-Secret-Key=S92PS48OE3`,
+    `/api/v1/golden_hour_quiz/questions/start-time/${id}?X-Company-Code=RFM&X-Secret-Key=3AD9R0RP44`,
   );
   return res.data;
 };
@@ -57,7 +57,7 @@ export const useStartQuestionTime = () => {
 
 const elapseQuestionTime = async (id: string | number) => {
   const res = await gameAxios.put(
-    `/api/v1/golden_hour_quiz/questions/time-elapse/${id}?X-Company-Code=RTM&X-Secret-Key=S92PS48OE3`,
+    `/api/v1/golden_hour_quiz/questions/time-elapse/${id}?X-Company-Code=RFM&X-Secret-Key=3AD9R0RP44`,
   );
   return res.data;
 };
@@ -111,7 +111,7 @@ export const useCreateHostRealtimeToken = () => {
 
 export const getQuestionResultsTally = async (id: string | number) => {
   const res = await gameAxios.get(
-    `/api/v1/golden_hour_quiz/questions/tally/${id}?X-Company-Code=RTM&X-Secret-Key=S92PS48OE3`,
+    `/api/v1/golden_hour_quiz/questions/tally/${id}?X-Company-Code=RFM&X-Secret-Key=3AD9R0RP44`,
   );
   return res.data as QuestionTallyResponse;
 };
@@ -181,7 +181,7 @@ export const useListQuizSessions = () => {
 
 const retrieveQuiz = async (id: string | number) => {
   const res = await gameAxios.get(
-    `/api/v1/golden_hour_quiz/sessions/${id}/?X-Company-Code=RTM&X-Secret-Key=S92PS48OE3`,
+    `/api/v1/golden_hour_quiz/sessions/${id}/?X-Company-Code=RFM&X-Secret-Key=3AD9R0RP44`,
   );
   return res.data;
 };
@@ -229,7 +229,7 @@ interface LockAnswerPayload {
 
 const lockAnswer = async (payload: LockAnswerPayload) => {
   const res = await gameAxios.post(
-    "/api/v1/golden_hour_quiz/lock/answer/?X-Company-Code=RTM&X-Secret-Key=S92PS48OE3",
+    "/api/v1/golden_hour_quiz/lock/answer/?X-Company-Code=RFM&X-Secret-Key=3AD9R0RP44",
     payload,
   );
   return res.data;

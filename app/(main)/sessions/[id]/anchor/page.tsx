@@ -1,8 +1,14 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, Lock, FileText, Loader2 } from "lucide-react";
+import { ChevronLeft, Lock, FileText, Loader2, Users2 } from "lucide-react";
 import Link from "next/link";
 
 import { useRequestNextQuestion } from "./misc/api";
@@ -28,9 +34,10 @@ import { useQueryClient } from "@tanstack/react-query";
 import { QuizQuestion } from "./misc/api/postRequestNextQuestion";
 import { useGetSessionDetails } from "../../misc/api";
 import { useGetComments } from "../../misc/api/getComments";
+import { AblyMessage } from "@/contexts/AblyProvider";
 
 const cardBase =
-  "rounded-3xl border border-white/10 bg-white/[0.04] px-4 py-3.5 md:p-5";
+  "rounded-3xl border border-white/10 bg-white/[0.03] px-4 py-3.5 md:p-5";
 
 type ControlButton = {
   label: string;
@@ -79,15 +86,15 @@ const ConnectionOverlay = ({
           Connection Required
         </h2>
         <p className="mb-8 text-white/60">
-          You must start a session to connect to Ably before you can control the
-          quiz.
+          Click the button below to connect to Ably before you assume full
+          control of the quiz.
         </p>
         <button
           onClick={onStartSession}
           disabled={loading}
           className="w-full rounded-2xl bg-gradient-to-r from-indigo-500 to-blue-500 px-8 py-4 text-lg font-bold text-white shadow-lg shadow-indigo-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50"
         >
-          {loading ? "Starting Session..." : "Start Session"}
+          {loading ? "Starting Session..." : "Enter Session"}
         </button>
       </div>
     </div>
@@ -130,15 +137,28 @@ const AnchorSessionPage = () => {
   // Sync initial comments
   useEffect(() => {
     if (commentsData?.results?.data) {
-      setComments(commentsData.results.data);
+      const sorted = [...commentsData.results.data].sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      );
+      setComments(sorted);
     }
   }, [commentsData]);
 
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const commentsEndRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when comments change
+  useEffect(() => {
+    commentsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [comments]);
+
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const processingEndRef = useRef(false); // Ref to prevent double execution of handleEndTimer
   const handleEndTimerRef = useRef<(() => Promise<void>) | null>(null); // Prevent stale closures
 
-  const { isConnected, sendMessage } = useAbly();
+  const { isConnected, sendMessage, addGlobalListener, removeGlobalListener } =
+    useAbly();
   const queryClient = useQueryClient();
 
   // Only subscribe to the topic if we are connected (have a valid token)
@@ -154,6 +174,73 @@ const AnchorSessionPage = () => {
     console.log("⚓ AnchorPage: Presence topic:", presenceTopic);
     console.log("⚓ AnchorPage: Present members updated:", presentMembers);
   }, [presenceTopic, presentMembers]);
+
+  const startCountdown = () => {
+    const duration = 10;
+    setTimer(duration);
+    setTimerRunning(true);
+    timerRef.current = setInterval(() => {
+      setTimer((prev) => {
+        if (prev <= 1) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          setTimerRunning(false);
+          if (handleEndTimerRef.current) {
+            handleEndTimerRef.current();
+          }
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+  const handleAblyMessage = useCallback((message: AblyMessage) => {
+    try {
+      console.log("Ably message received", message);
+      let eventType = message.event;
+      let messagePayload = message.payload;
+
+      // If event is generic "message" (default) or missing, look inside payload for 'event'
+      if ((!eventType || eventType === "message") && message.payload?.event) {
+        eventType = message.payload.event;
+        messagePayload = message.payload.data || message.payload;
+      }
+
+      // Handle different MQTT events
+      if (eventType) {
+        if (eventType === "Start Timer") {
+          const data = messagePayload.data || messagePayload;
+
+          const seconds = (data && data.seconds_allowed) || 10;
+
+          setTimer(seconds);
+          setTimerRunning(true);
+
+          if (timerRef.current) {
+            clearInterval(timerRef.current);
+            timerRef.current = null;
+          }
+
+          startCountdown();
+        } else if (eventType === "Publish Comment") {
+          const data = JSON.parse(messagePayload as string);
+
+          setComments((prev) => [...prev, data]);
+          console.log("Comment received", data);
+        }
+      }
+    } catch (error) {
+      console.log("Error in handleAblyMessage", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isConnected) {
+      addGlobalListener(handleAblyMessage);
+      return () => {
+        removeGlobalListener(handleAblyMessage);
+      };
+    }
+  }, [isConnected, addGlobalListener, removeGlobalListener, handleAblyMessage]);
 
   // Answers State
   const [answers, setAnswers] = useState<
@@ -224,7 +311,7 @@ const AnchorSessionPage = () => {
           created_at: new Date().toISOString(),
         };
 
-        setComments((prev) => [newComment, ...prev]);
+        setComments((prev) => [...prev, newComment]);
         addLog(`New comment: ${payload.comment?.substring(0, 20)}...`);
       }
     },
@@ -311,11 +398,11 @@ const AnchorSessionPage = () => {
 
           setQuestion(q);
           setQuestionIndex(qIndex);
-          const payload = {
-            event: "quest",
-            data: data,
-          };
-          await sendMessage(payload, topic);
+          // const payload = {
+          //   event: "quest",
+          //   data: data,
+          // };
+          // await sendMessage(payload, topic);
           addLog(`Sent question ${qIndex} to players.`);
         },
       });
@@ -337,25 +424,6 @@ const AnchorSessionPage = () => {
 
     if (timerRef.current) clearInterval(timerRef.current);
 
-    const startCountdown = () => {
-      const duration = 10;
-      setTimer(duration);
-      setTimerRunning(true);
-      timerRef.current = setInterval(() => {
-        setTimer((prev) => {
-          if (prev <= 1) {
-            if (timerRef.current) clearInterval(timerRef.current);
-            setTimerRunning(false);
-            if (handleEndTimerRef.current) {
-              handleEndTimerRef.current();
-            }
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    };
-
     await startQTime.mutateAsync(question.question_id, {
       onSuccess: async () => {
         await sendMessage(
@@ -365,7 +433,6 @@ const AnchorSessionPage = () => {
           },
           topic,
         );
-        startCountdown();
         addLog("Timer started (10s)");
         processingEndRef.current = false;
         setActiveAction(null);
@@ -410,10 +477,7 @@ const AnchorSessionPage = () => {
       );
       addLog(`Timer ended. Correct: ${correct || "?"}`);
       setTimerRunning(false);
-      await sendMessage(
-        { event: "leaderboard_update", data: tallyRes.data },
-        topic,
-      );
+
       addLog("Tally sent.");
     } catch {
       addLog("Failed to get/send tally.");
@@ -550,26 +614,29 @@ const AnchorSessionPage = () => {
   }
 
   return (
-    <div className="min-h-screen pb-16">
-      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 md:gap-6 p-3 md:py-8 sm:px-6 lg:px-10">
+    <div className="">
+      <div className="mx-auto flex w-full max-w-[1440px] flex-col gap-4 md:gap-6">
         <header className="rounded-3xl border border-white/10 bg-white/[0.05] p-3 md:px-5 md:py5 shadow-[0_40px_80px_-60px_rgba(15,0,38,0.9)] backdrop-blur">
-          <div className="flex md:flex-col justify-between gap-4 md:gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex md:flex-col items-center md:items-start gap-4">
+          <div className="flex md:flex-col justify-between gap-4 md:gap-6 lg:flex-row lg:justify-between">
+            <section className="flex md:flex-col items-center md:items-start gap-4">
               <Link
                 href={`/sessions/${id}`}
                 className="flex p-2 md:px-4 md:py-2 items-center justify-center w-max rounded-full border border-white/10 bg-white/10 text-xs font-semibold uppercase tracking-[0.2em] text-white/70 transition hover:bg-white/20"
               >
                 <ChevronLeft className="inline size-3 lg:size-5 md:mr-1 md:-ml-1" />
-                <span className="max-md:hidden">Back to sessions</span>
+                <span className="max-md:hidden">Back</span>
               </Link>
-              <div>
-                <h1 className="sm:text-2xl md:text-3xl font-semibold text-white/90 truncate ">
-                  {/* {quizData?.data?.id || `Session ${id}`} */}
-                  Session {id}
-                </h1>
-              </div>
-            </div>
-            <div className="flex flex-wrap items-center gap-1 md:gap-3 shrink-0">
+              {/* <h1 className="sm:text-2xl md:text-3xl font-semibold text-white/90 truncate ">
+                Session {id}
+              </h1> */}
+            </section>
+
+            <p className="text-xl md:text-2xl text-white font-semibold">
+              <Users2 className="inline size-5 mr-1.5" />{" "}
+              {presentMembers.length.toString()}
+              <span className="text-base ml-1.5 ">online</span>
+            </p>
+            <section className="flex flex-wrap items-center gap-1 md:gap-3 shrink-0">
               <StatusBadge
                 label="Ably"
                 value={isConnected ? "Online" : "Offline"}
@@ -579,34 +646,90 @@ const AnchorSessionPage = () => {
                 label="Players"
                 value={presentMembers.length.toString()}
                 tone="default"
+                className="md:text-xl"
               />
               {timerRunning && (
                 <StatusBadge label="Timer" value={`${timer}s`} tone="accent" />
               )}
-            </div>
+            </section>
           </div>
         </header>
 
-        <div className="grid gap-4 md:gap-6 lg:grid-cols-[1fr_350px]">
+        <div className="grid gap-4 md:gap-6 lg:grid-cols-[280px_1fr_300px] 2xl:grid-cols-[320px_1fr_350px]">
+          {/* Left Column: Live Answers */}
+          <aside className="space-y-4 md:space-y-6">
+            <div
+              className={`${cardBase} flex flex-col gap-4 h-[600px] lg:h-[calc(100vh-280px)]`}
+            >
+              <div className="flex items-center justify-between">
+                <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">
+                  Live Answers
+                </h2>
+                <div className="bg-indigo-500/20 text-indigo-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-indigo-500/30">
+                  {answers.length}
+                </div>
+              </div>
+
+              {answers.length === 0 ? (
+                <div className="flex flex-1 items-center justify-center text-center p-4">
+                  <p className="text-sm text-white/40">
+                    Waiting for answers...
+                  </p>
+                </div>
+              ) : (
+                <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                  {answers.map((answer) => (
+                    <div
+                      key={answer.id}
+                      className="rounded-xl bg-white/[0.03] p-4 border border-white/5 flex flex-col gap-2 hover:bg-white/[0.05] transition-colors"
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-white/90 font-mono font-medium">
+                          {answer.phone_number}
+                        </span>
+                        <span className="text-[10px] text-white/30">
+                          {new Date(answer.timestamp).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-center size-6 rounded-lg bg-indigo-500/20 border border-indigo-500/30 text-[10px] font-bold text-indigo-300">
+                          {answer.selected_option}
+                        </div>
+                        <span className="text-xs font-semibold text-indigo-400">
+                          Option {answer.selected_option}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </aside>
+
+          {/* Center Column: Question & Controls */}
           <div className="space-y-4 md:space-y-6">
-            <section className={`${cardBase} flex flex-col gap-2.5 md:gap-5`}>
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <h2 className="text-sm font-semibold uppercase tracking-[0.2em] text-white/50">
-                  Question feed
+            <section className={`${cardBase} flex flex-col gap-4 md:gap-7`}>
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold uppercase tracking-[0.2em] text-white/50">
+                  Current Question
                 </h2>
                 {question && (
-                  <span className="rounded-full bg-indigo-500/20 px-4 py-1 text-xs font-semibold text-indigo-200">
-                    Q{questionIndex}
+                  <span className="rounded-full bg-indigo-500/20 px-4 py-1.5 text-xs font-bold text-indigo-200 border border-indigo-500/30">
+                    Question {questionIndex}
                   </span>
                 )}
               </div>
 
               {question ? (
-                <div className="space-y-4">
-                  <p className="text-sm font-semibold text-white/90">
+                <div className="space-y-6">
+                  <p className="text-xl md:text-2xl font-bold text-white leading-relaxed">
                     {question.question}
                   </p>
-                  <div className="grid gap-2 grid-cols-2">
+                  <div className="grid gap-3 sm:grid-cols-2">
                     {["option_a", "option_b", "option_c", "option_d"].map(
                       (key, idx) => {
                         const optionKey = key as keyof typeof question;
@@ -615,14 +738,14 @@ const AnchorSessionPage = () => {
                         return (
                           <div
                             key={optionKey as string | number}
-                            className={`rounded-2xl border px-4 py-3 text-xs sm:text-sm font-medium transition ${
+                            className={`rounded-2xl border p-5 text-sm md:text-base font-semibold transition-all ${
                               isCorrect
-                                ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-100"
+                                ? "border-emerald-500/60 bg-emerald-500/10 text-emerald-100 shadow-[0_0_20px_-5px_rgba(16,185,129,0.2)]"
                                 : "border-white/10 bg-white/[0.03] text-white/80"
                             }`}
                           >
-                            <span className="mr-2 text-xs font-semibold tracking-[0.3em] text-white/50">
-                              {label}.
+                            <span className="mr-3 text-xs font-bold tracking-[0.2em] text-white/30">
+                              {label}
                             </span>
                             {question[optionKey]}
                           </div>
@@ -631,138 +754,108 @@ const AnchorSessionPage = () => {
                     )}
                   </div>
                   {correctOption && (
-                    <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-2 text-xs font-semibold text-emerald-200">
-                      Option {correctOption} locked in as the correct answer.
+                    <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-5 py-3 text-sm font-bold text-emerald-300 flex items-center gap-3">
+                      <div className="size-2 rounded-full bg-emerald-400 animate-pulse" />
+                      Correct answer: Option {correctOption}
                     </div>
                   )}
                 </div>
               ) : (
-                <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-8 text-center text-sm text-white/50">
-                  <span>No active question yet.</span>
-                  <span>Use “Send next question” to load the next prompt.</span>
+                <div className="flex flex-col items-center justify-center gap-4 rounded-3xl border border-dashed border-white/10 bg-white/[0.02] py-20 px-8 text-center">
+                  <div className="p-4 rounded-full bg-white/5 text-white/20">
+                    <FileText size={40} />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-lg font-semibold text-white/60">
+                      No active question
+                    </p>
+                    <p className="text-sm text-white/40">
+                      Use "Send next question" to push content to players
+                    </p>
+                  </div>
                 </div>
               )}
 
-              <div className="grid gap-2 grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-3 grid-cols-2">
                 {controlButtons.map(renderControlButton)}
               </div>
 
-              {/* Timer Moved Here */}
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <p className="text-[10px] uppercase tracking-[0.3em] text-white/40">
-                  Timer
-                </p>
-                <div className="mt-2 flex items-end justify-between">
-                  <span className="text-3xl font-semibold text-white/90">
+              {/* Timer UI Polish */}
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-white/40">
+                    Remaining Time
+                  </p>
+                  <div
+                    className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase ${timerRunning ? "bg-orange-500/20 text-orange-400 border border-orange-500/30" : "bg-white/10 text-white/40"}`}
+                  >
+                    {timerRunning ? "Live" : "Paused"}
+                  </div>
+                </div>
+                <div className="flex items-baseline gap-2">
+                  <span
+                    className={`text-5xl font-black tabular-nums transition-colors ${timerRunning && timer <= 3 ? "text-rose-500" : "text-white"}`}
+                  >
                     {timerRunning ? timer : "00"}
                   </span>
-                  <span className="text-[11px] text-white/40">seconds</span>
+                  <span className="text-xs font-bold text-white/20 uppercase tracking-widest">
+                    seconds
+                  </span>
                 </div>
-                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
+                <div className="mt-5 h-2 w-full overflow-hidden rounded-full bg-white/5">
                   <div
-                    className="h-full transition-[width] ease-linear rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 "
+                    className={`h-full transition-[width] ease-linear rounded-full bg-gradient-to-r ${timerRunning && timer <= 3 ? "from-rose-600 to-red-500" : "from-indigo-500 via-purple-500 to-pink-500"}`}
                     style={{
-                      width: `${Math.max(0, Math.min(timer, 10)) * 10}%`,
+                      width: `${(Math.max(0, Math.min(timer, 10)) / 10) * 100}%`,
                     }}
                   ></div>
                 </div>
-              </div>
-
-              {/* Live Answers Section ADDED */}
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 flex flex-col gap-4 h-[300px]">
-                <div className="flex items-center justify-between">
-                  <p className="text-[10px] uppercase tracking-[0.3em] text-white/40">
-                    Live Answers
-                  </p>
-                  <div className="bg-white/10 text-white/60 text-[10px] px-2 py-0.5 rounded-full">
-                    {answers.length}
-                  </div>
-                </div>
-
-                {answers.length === 0 ? (
-                  <div className="flex flex-1 items-center justify-center text-center p-4">
-                    <p className="text-sm text-white/40">
-                      Waiting for answers...
-                    </p>
-                  </div>
-                ) : (
-                  <div className="flex-1 overflow-y-auto space-y-2 pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
-                    {answers.map((answer) => (
-                      <div
-                        key={answer.id}
-                        className="rounded-xl bg-white/[0.03] p-3 border border-white/5 flex justify-between items-center"
-                      >
-                        <span className="text-xs text-white/80 font-mono">
-                          {answer.phone_number}
-                        </span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-indigo-400">
-                            Option {answer.selected_option}
-                          </span>
-                          <span className="text-[10px] text-white/30">
-                            {new Date(answer.timestamp).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              second: "2-digit",
-                            })}
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             </section>
           </div>
 
           <aside className="space-y-4 md:space-y-6">
-            {quizData?.data?.is_manual && (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-                <p className="text-[10px] uppercase tracking-[0.3em] text-white/40 mb-3">
-                  Manual Actions
-                </p>
+            <div className="grid gap-3 grid-cols-2 lg:grid-cols-1">
+              {quizData?.data?.is_manual && (
                 <button
                   onClick={() => setIsLockAnswerOpen(true)}
                   disabled={!question}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/20 hover:border-orange-500/30 text-orange-400 py-3 text-sm font-semibold transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full flex items-center justify-center gap-2 rounded-2xl bg-orange-500/10 border border-orange-500/20 hover:bg-orange-500/20 hover:border-orange-500/30 text-orange-400 p-4 text-sm font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-500/5"
                 >
-                  <Lock size={16} />
+                  <Lock size={18} />
                   <span>Lock Answer</span>
                 </button>
-              </div>
-            )}
+              )}
 
-            {/* Moved Activity Log trigger here */}
-            <button
-              onClick={() => setIsActivityLogOpen(true)}
-              className="w-full rounded-2xl border border-white/10 bg-white/[0.03] p-4 flex items-center justify-between hover:bg-white/[0.05] transition-colors group"
-            >
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-white/5 text-white/60 group-hover:bg-white/10 group-hover:text-white transition-colors">
-                  <FileText size={18} />
+              <button
+                onClick={() => setIsActivityLogOpen(true)}
+                className="w-full rounded-2xl border border-white/10 bg-white/[0.03] p-4 flex items-center justify-between hover:bg-white/[0.05] transition-colors group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-xl bg-white/5 text-white/60 group-hover:bg-white/10 group-hover:text-white transition-colors">
+                    <FileText size={20} />
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-bold text-white/80">
+                      Activity Log
+                    </p>
+                    <p className="text-[10px] font-medium text-white/40">
+                      {log.length} events recorded
+                    </p>
+                  </div>
                 </div>
-                <div className="text-left">
-                  <p className="text-sm font-medium text-white/80">
-                    Activity Log
-                  </p>
-                  <p className="text-[10px] text-white/40">
-                    {log.length} events recorded
-                  </p>
-                </div>
-              </div>
-            </button>
+              </button>
+            </div>
 
-            {/* Session Info REMOVED */}
-
-            {/* Comments Section ADDED */}
+            {/* Comments Column */}
             <div
-              className={`${cardBase} flex flex-col gap-4 h-[400px] md:h-[500px]`}
+              className={`${cardBase} flex flex-col gap-4 h-[500px] lg:h-[calc(100vh-420px)]`}
             >
               <div className="flex items-center justify-between">
-                <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-white/50">
+                <h2 className="text-xs font-bold uppercase tracking-[0.2em] text-white/50">
                   Comments
                 </h2>
-                <div className="bg-white/10 text-white/60 text-[10px] px-2 py-0.5 rounded-full">
+                <div className="bg-white/10 text-white/60 text-[10px] font-bold px-2 py-0.5 rounded-full border border-white/10">
                   {comments.length}
                 </div>
               </div>
@@ -773,25 +866,23 @@ const AnchorSessionPage = () => {
                 </div>
               ) : comments.length === 0 ? (
                 <div className="flex flex-1 items-center justify-center text-center p-4">
-                  <p className="text-sm text-white/40">
-                    No comments yet. Waiting for interaction...
-                  </p>
+                  <p className="text-sm text-white/40">No comments yet...</p>
                 </div>
               ) : (
                 <div className="flex-1 overflow-y-auto space-y-3 pr-2 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
                   {comments.map((comment) => (
                     <div
                       key={comment.id}
-                      className="rounded-xl bg-white/[0.03] p-3 border border-white/5"
+                      className="rounded-xl bg-white/[0.03] p-4 border border-white/5 space-y-2 hover:bg-white/[0.05] transition-colors"
                     >
-                      <p className="text-sm text-white/90 mb-1">
+                      <p className="text-sm text-white leading-relaxed">
                         {comment.comment}
                       </p>
-                      <div className="flex justify-between items-center">
-                        <span className="text-[10px] text-white/40">
+                      <div className="flex justify-end gap-2 items-center">
+                        <span className="text-[10px] font-medium text-white/40">
                           {comment.phone_number}
                         </span>
-                        <span className="text-[10px] text-white/30">
+                        <span className="text-[10px] text-white/20">
                           {new Date(comment.created_at).toLocaleTimeString([], {
                             hour: "2-digit",
                             minute: "2-digit",
@@ -800,6 +891,7 @@ const AnchorSessionPage = () => {
                       </div>
                     </div>
                   ))}
+                  <div ref={commentsEndRef} />
                 </div>
               )}
             </div>

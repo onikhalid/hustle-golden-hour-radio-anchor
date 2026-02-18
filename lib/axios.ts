@@ -7,7 +7,7 @@ export const gameAxios = Axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
-    "ngrok-skip-browser-warning": "true",
+    // "ngrok-skip-browser-warning": "true",
   },
 });
 
@@ -15,13 +15,13 @@ export const tokenlessAxios = Axios.create({
   baseURL: API_BASE_URL,
   headers: {
     "Content-Type": "application/json",
-    "ngrok-skip-browser-warning": "true",
+    // "ngrok-skip-browser-warning": "true",
   },
 });
 
 tokenlessAxios.interceptors.request.use((config) => {
   Object.assign(config.headers, {
-    "ngrok-skip-browser-warning": "true",
+    // "ngrok-skip-browser-warning": "true",
   });
   return config;
 });

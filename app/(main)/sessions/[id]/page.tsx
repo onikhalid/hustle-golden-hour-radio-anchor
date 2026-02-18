@@ -12,6 +12,7 @@ import {
   Settings2,
   HelpCircle,
   Plus,
+  Play,
 } from "lucide-react";
 import { useGetSessionDetails } from "../misc/api";
 import { cn } from "@/lib/utils";
@@ -43,12 +44,12 @@ export default function SessionDetailsPage() {
   if (error || !session) {
     return (
       <div className="space-y-4">
-        <button
-          onClick={() => router.back()}
+        <Link
+          href="/sessions"
           className="flex items-center gap-2 text-sm text-white/60 hover:text-white transition"
         >
           <ArrowLeft className="h-4 w-4" /> Back to sessions
-        </button>
+        </Link>
         <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-6 text-red-400">
           <p>
             {error instanceof Error
@@ -101,25 +102,14 @@ export default function SessionDetailsPage() {
 
           <div className="flex items-center gap-3">
             <Link
+              className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] hover:bg-emerald-200 px-5 py-3 backdrop-blur-sm"
               href={`/sessions/${id}/anchor`}
-              className="flex items-center gap-2 rounded-xl bg-white/5 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10 disabled:opacity-50"
             >
-              <Plus className={`h-4 w-4`} />
-              Anchor
+              <span className={cn("text-sm font-semibold text-emerald-400")}>
+                Anchor
+              </span>
+              <Play className={`h-4 w-4 text-emerald-400`} />
             </Link>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-5 py-3 backdrop-blur-sm">
-              <span className="block text-[10px] uppercase tracking-widest text-white/40 mb-1">
-                Status
-              </span>
-              <span
-                className={cn(
-                  "text-sm font-semibold",
-                  session.is_active ? "text-emerald-400" : "text-white/60",
-                )}
-              >
-                {session.is_active ? "Currently Live" : "Session Closed"}
-              </span>
-            </div>
           </div>
         </div>
       </header>

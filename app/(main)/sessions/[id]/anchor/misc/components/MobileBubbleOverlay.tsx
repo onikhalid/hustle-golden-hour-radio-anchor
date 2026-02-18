@@ -420,7 +420,7 @@ export const MobileBubbleOverlay: React.FC<MobileBubbleOverlayProps> = ({
 
             <div className="mt-6 max-h-[320px] overflow-y-auto rounded-2xl border border-white/10 bg-white/[0.03]">
               <table className="w-full text-left text-xs text-white/80">
-                <thead className="sticky top-0 bg-white/[0.04] text-[11px] uppercase tracking-[0.2em] text-white/40">
+                <thead className="sticky top-0 bg-white/[0.03] text-[11px] uppercase tracking-[0.2em] text-white/40">
                   <tr>
                     <th className="px-4 py-3">Contestant</th>
                     <th className="px-4 py-3">Answer</th>

@@ -21,8 +21,7 @@ const toneMap: Record<NonNullable<ActionConfig["tone"]>, string> = {
     "bg-gradient-to-r from-purple-500 to-pink-500 text-white hover:from-purple-400 hover:to-pink-400",
   danger:
     "bg-gradient-to-r from-rose-600 to-red-500 text-white hover:from-rose-500 hover:to-red-400",
-  neutral:
-    "bg-white/10 text-white hover:bg-white/20",
+  neutral: "bg-white/10 text-white hover:bg-white/20",
 };
 
 const ActionButton: React.FC<ActionConfig> = ({
@@ -47,10 +46,16 @@ const ActionButton: React.FC<ActionConfig> = ({
   </button>
 );
 
-export const ActionSection: React.FC<ActionSectionProps> = ({ title, hint, actions }) => (
-  <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-5 shadow-[0_20px_45px_-24px_rgba(15,0,38,0.6)]">
+export const ActionSection: React.FC<ActionSectionProps> = ({
+  title,
+  hint,
+  actions,
+}) => (
+  <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 shadow-[0_20px_45px_-24px_rgba(15,0,38,0.6)]">
     <div className="mb-4">
-      <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-white/50">{title}</h3>
+      <h3 className="text-xs font-semibold uppercase tracking-[0.2em] text-white/50">
+        {title}
+      </h3>
       {hint && <p className="mt-1 text-xs text-white/40">{hint}</p>}
     </div>
     <div className="flex flex-col gap-2">

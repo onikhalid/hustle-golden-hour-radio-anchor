@@ -20,8 +20,8 @@ export const listQuestions = async (
     "api/v1/golden_hour_quiz/questions/list",
     {
       params: {
-        "X-Company-Code": "RTM",
-        "X-Secret-Key": "S92PS48OE3",
+        "X-Company-Code": "RFM",
+        "X-Secret-Key": "3AD9R0RP44",
         page,
       },
     },

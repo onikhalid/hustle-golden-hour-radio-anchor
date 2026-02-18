@@ -21,7 +21,7 @@ const token = tokenStorage.getToken();
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    "ngrok-skip-browser-warning": "true",
+    // "ngrok-skip-browser-warning": "true",
     Authorization: token ? `Bearer ${token}` : "",
   },
 });
@@ -88,8 +88,8 @@ export async function listCategories(): Promise<ApiResponse<CategoryData[]>> {
       "/api/v1/golden_hour_quiz/categories/list/",
       {
         params: {
-          "X-Company-Code": "RTM",
-          "X-Secret-Key": "S92PS48OE3",
+          "X-Company-Code": "RFM",
+          "X-Secret-Key": "3AD9R0RP44",
         },
         headers: {
           Authorization: `Bearer ${token || "14bee5e7ef2d5124ee8fd1d1d1840c28f8a29ec1"}`,
@@ -127,8 +127,8 @@ export async function assignQuestionToSession(
       data,
       {
         params: {
-          "X-Company-Code": "RTM",
-          "X-Secret-Key": "S92PS48OE3",
+          "X-Company-Code": "RFM",
+          "X-Secret-Key": "3AD9R0RP44",
         },
         headers: {
           Authorization: `Bearer ${token || "14bee5e7ef2d5124ee8fd1d1d1840c28f8a29ec1"}`,
@@ -164,8 +164,8 @@ export async function updateQuestion(
       data,
       {
         params: {
-          "X-Company-Code": "RTM",
-          "X-Secret-Key": "S92PS48OE3",
+          "X-Company-Code": "RFM",
+          "X-Secret-Key": "3AD9R0RP44",
         },
         headers: {
           Authorization: `Bearer ${token || "14bee5e7ef2d5124ee8fd1d1d1840c28f8a29ec1"}`,
@@ -198,8 +198,8 @@ export async function listQuestions(): Promise<ApiResponse<Question[]>> {
       "/api/v1/golden_hour_quiz/questions/list/",
       {
         params: {
-          "X-Company-Code": "RTM",
-          "X-Secret-Key": "S92PS48OE3",
+          "X-Company-Code": "RFM",
+          "X-Secret-Key": "3AD9R0RP44",
         },
         headers: {
           Authorization: `Bearer ${token || "14bee5e7ef2d5124ee8fd1d1d1840c28f8a29ec1"}`,
@@ -235,8 +235,8 @@ export async function createQuestion(
       data,
       {
         params: {
-          "X-Company-Code": "RTM",
-          "X-Secret-Key": "S92PS48OE3",
+          "X-Company-Code": "RFM",
+          "X-Secret-Key": "3AD9R0RP44",
         },
         headers: {
           Authorization: `Bearer ${token || "14bee5e7ef2d5124ee8fd1d1d1840c28f8a29ec1"}`,
@@ -271,8 +271,8 @@ export async function createSession(
       data,
       {
         params: {
-          "X-Company-Code": "RTM",
-          "X-Secret-Key": "S92PS48OE3",
+          "X-Company-Code": "RFM",
+          "X-Secret-Key": "3AD9R0RP44",
         },
         headers: {
           Authorization: `Bearer ${token || "14bee5e7ef2d5124ee8fd1d1d1840c28f8a29ec1"}`,
@@ -307,8 +307,8 @@ export async function getSessionDetails(
       `/api/v1/golden_hour_quiz/sessions/${sessionId}/`,
       {
         params: {
-          "X-Company-Code": "RTM",
-          "X-Secret-Key": "S92PS48OE3",
+          "X-Company-Code": "RFM",
+          "X-Secret-Key": "3AD9R0RP44",
         },
         headers: {
           Authorization: `Bearer ${token || "14bee5e7ef2d5124ee8fd1d1d1840c28f8a29ec1"}`,
