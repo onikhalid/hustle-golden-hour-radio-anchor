@@ -655,7 +655,7 @@ const AnchorSessionPage = () => {
           </div>
         </header>
 
-        <div className="grid gap-4 md:gap-6 lg:grid-cols-[280px_1fr_300px] 2xl:grid-cols-[320px_1fr_350px]">
+        <div className="grid gap-4 md:gap-6 lg:grid-cols-[280px_1fr_300px] 2xl:grid-cols-[320px_1fr_350px] backdrop-blur-xl">
           {/* Left Column: Live Answers */}
           <aside className="space-y-4 md:space-y-6">
             <div
