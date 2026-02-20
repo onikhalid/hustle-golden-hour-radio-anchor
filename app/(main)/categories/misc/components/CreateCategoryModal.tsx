@@ -4,7 +4,8 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import GradientButton from "@/components/ui/GradientButton";
 
-const modalCardClasses = "rounded-3xl border border-white/10 bg-white/[0.07] p-6 shadow-[0_40px_120px_-60px_rgba(5,0,20,0.9)] backdrop-blur-xl";
+const modalCardClasses =
+  "rounded-3xl border border-white/10 bg-white/[0.07] p-6 shadow-[0_40px_120px_-60px_rgba(5,0,20,0.9)] backdrop-blur-xl";
 
 const createCategorySchema = z.object({
   name: z
@@ -57,8 +58,14 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 px-4 py-10 backdrop-blur">
-      <div className="absolute inset-0" onClick={handleClose} aria-hidden="true" />
-      <div className={`${modalCardClasses} relative z-10 w-full max-w-xl text-white/90`}>
+      <div
+        className="absolute inset-0"
+        onClick={handleClose}
+        aria-hidden="true"
+      />
+      <div
+        className={`${modalCardClasses} relative z-10 w-full max-w-xl text-white/90`}
+      >
         <button
           type="button"
           onClick={handleClose}
@@ -68,16 +75,26 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
         </button>
 
         <header className="flex flex-col gap-2 pr-14">
-          <span className="text-xs uppercase tracking-[0.3em] text-white/50">Create Category</span>
-          <h2 className="text-xl font-semibold text-white">Spin up a new session</h2>
+          <span className="text-xs uppercase tracking-[0.3em] text-white/50">
+            Create Category
+          </span>
+          <h2 className="text-xl font-semibold text-white">
+            Create a new category
+          </h2>
           <p className="text-sm text-white/60">
-            Give the Category a memorable name and a quick pitch. Players will see both.
+            Give the Category a memorable name and a quick pitch. Players will
+            see both.
           </p>
         </header>
 
-        <form className="mt-6 space-y-5" onSubmit={handleSubmit(internalSubmit)}>
+        <form
+          className="mt-6 space-y-5"
+          onSubmit={handleSubmit(internalSubmit)}
+        >
           <div>
-            <label className="block text-xs uppercase tracking-[0.2em] text-white/50">Name</label>
+            <label className="block text-xs uppercase tracking-[0.2em] text-white/50">
+              Name
+            </label>
             <input
               type="text"
               {...register("name")}
@@ -85,11 +102,11 @@ export const CreateCategoryModal: React.FC<CreateCategoryModalProps> = ({
               className="mt-2 w-full rounded-2xl border border-white/15 bg-white/[0.05] px-4 py-3 text-sm text-white placeholder:text-white/30 focus:border-white/40 focus:outline-none focus:ring-0"
             />
             {errors.name && (
-              <p className="mt-2 text-xs text-rose-300">{errors.name.message}</p>
+              <p className="mt-2 text-xs text-rose-300">
+                {errors.name.message}
+              </p>
             )}
           </div>
-
-         
 
           <div className="flex items-center justify-end gap-3">
             <button
