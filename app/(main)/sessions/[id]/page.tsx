@@ -64,12 +64,12 @@ export default function SessionDetailsPage() {
   return (
     <div className="space-y-8 pb-12">
       <header className="flex flex-col gap-4">
-        <button
-          onClick={() => router.back()}
+        <Link
+          href="/sessions"
           className="flex w-fit items-center gap-2 text-sm text-white/60 hover:text-white transition mb-2"
         >
           <ArrowLeft className="h-4 w-4" /> Back to sessions
-        </button>
+        </Link>
 
         <div className="flex flex-col md:flex-row md:items-center justify-between">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
